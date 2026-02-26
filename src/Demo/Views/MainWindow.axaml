@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AvaloniaVirtualDataGrid.Controls;assembly=AvaloniaVirtualDataGrid"
+        x:Class="Demo.Views.MainWindow"
+        Title="AvaloniaVirtualDataGrid Demo"
+        Width="900" Height="600"
+        WindowStartupLocation="CenterScreen">
+
+    <Grid RowDefinitions="Auto,*" Margin="16">
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="AvaloniaVirtualDataGrid Demo" 
+                       FontSize="24" 
+                       FontWeight="Bold"/>
+            <TextBlock x:Name="CountText" 
+                       FontSize="14" 
+                       Foreground="Gray"
+                       Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <local:VirtualDataGrid Grid.Row="1" 
+                               x:Name="DataGrid"
+                               RowHeight="32"/>
+    </Grid>
+</Window>

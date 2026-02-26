@@ -1,0 +1,60 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AvaloniaVirtualDataGrid.Controls">
+
+    <Style Selector="local|VirtualDataGrid">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="#FFCCCCCC" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="RowHeight" Value="32" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}">
+                    <Grid RowDefinitions="Auto,*">
+                        <Border Grid.Row="0" x:Name="PART_HeaderBorder"
+                              Background="#FFF0F0F0"
+                              BorderBrush="#FFCCCCCC"
+                              BorderThickness="0,0,0,1">
+                            <ItemsControl x:Name="PART_ColumnHeaders"
+                                          ItemsSource="{TemplateBinding Columns}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border MinWidth="80" Height="32" BorderBrush="#FFCCCCCC" BorderThickness="0,0,1,0">
+                                            <TextBlock Text="{Binding Header}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="8,0"
+                                                       FontWeight="SemiBold" />
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                        <ScrollViewer Grid.Row="1" x:Name="PART_ScrollViewer"
+                                      Background="Transparent"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto">
+                            <local:VirtualDataGridPanel x:Name="PART_ItemsPanel"
+                                                        RowHeight="{TemplateBinding RowHeight}" />
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style Selector="local|VirtualDataRow">
+        <Setter Property="Height" Value="32" />
+    </Style>
+
+    <Style Selector="local|VirtualDataCell">
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+</Styles>

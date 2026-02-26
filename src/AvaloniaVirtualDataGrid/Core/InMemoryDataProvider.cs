@@ -1,0 +1,111 @@
+using System.Collections;
+
+namespace AvaloniaVirtualDataGrid.Core;
+
+public class InMemoryDataProvider<T> : IDataProvider<T>, IList<T>
+{
+    private readonly List<T> _items;
+    private Comparison<T?>? _comparison;
+
+    public InMemoryDataProvider(IEnumerable<T> items)
+    {
+        _items = new List<T>(items);
+    }
+
+    public InMemoryDataProvider() : this([])
+    {
+    }
+
+    public int Count => _items.Count;
+
+    public event EventHandler<DataProviderChangedEventArgs>? DataChanged;
+
+    public ValueTask<IReadOnlyList<T>> GetRangeAsync(int startIndex, int count, CancellationToken cancellationToken = default)
+    {
+        if (startIndex < 0 || startIndex >= _items.Count)
+            return new ValueTask<IReadOnlyList<T>>(Array.Empty<T>());
+
+        var actualCount = Math.Min(count, _items.Count - startIndex);
+        var result = new T[actualCount];
+        _items.CopyTo(startIndex, result, 0, actualCount);
+        return new ValueTask<IReadOnlyList<T>>(result);
+    }
+
+    public void Sort(Comparison<T?> comparison)
+    {
+        _comparison = comparison;
+        _items.Sort(comparison);
+        OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.Sorted));
+    }
+
+    public void Sort(IComparer<T?> comparer)
+    {
+        _items.Sort(comparer);
+        OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.Sorted));
+    }
+
+    public void Reset(IEnumerable<T> newItems)
+    {
+        _items.Clear();
+        _items.AddRange(newItems);
+        OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.Reset));
+    }
+
+    public void Add(T item)
+    {
+        _items.Add(item);
+        OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.ItemsAdded, _items.Count - 1, 1));
+    }
+
+    public void Insert(int index, T item)
+    {
+        _items.Insert(index, item);
+        OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.ItemsAdded, index, 1));
+    }
+
+    public bool Remove(T item)
+    {
+        var index = _items.IndexOf(item);
+        if (index >= 0)
+        {
+            _items.RemoveAt(index);
+            OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.ItemsRemoved, index, 1));
+            return true;
+        }
+        return false;
+    }
+
+    public void RemoveAt(int index)
+    {
+        _items.RemoveAt(index);
+        OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.ItemsRemoved, index, 1));
+    }
+
+    public void Clear()
+    {
+        _items.Clear();
+        OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.Reset));
+    }
+
+    public T this[int index]
+    {
+        get => _items[index];
+        set
+        {
+            _items[index] = value;
+            OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.ItemsReplaced, index, 1));
+        }
+    }
+
+    public int IndexOf(T item) => _items.IndexOf(item);
+    public bool Contains(T item) => _items.Contains(item);
+    public void CopyTo(T[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);
+    public bool IsReadOnly => false;
+    public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
+
+    protected virtual void OnDataChanged(DataProviderChangedEventArgs e)
+    {
+        DataChanged?.Invoke(this, e);
+    }
+}
