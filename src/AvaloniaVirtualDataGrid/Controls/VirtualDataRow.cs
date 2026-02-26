@@ -36,6 +36,9 @@ public class VirtualDataRow : ContentControl
     {
         _cellsGrid = new Grid();
         Content = _cellsGrid;
+        Background = new SolidColorBrush(Colors.White);
+        BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
+        BorderThickness = new Thickness(0, 0, 0, 1);
 
         Cells = [];
         Cells.CollectionChanged += OnCellsCollectionChanged;

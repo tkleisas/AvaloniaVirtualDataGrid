@@ -2,10 +2,9 @@ using System.Collections;
 
 namespace AvaloniaVirtualDataGrid.Core;
 
-public class InMemoryDataProvider<T> : IDataProvider<T>, IList<T>
+public class InMemoryDataProvider<T> : IDataProvider<T>, IList, IList<T>
 {
     private readonly List<T> _items;
-    private Comparison<T?>? _comparison;
 
     public InMemoryDataProvider(IEnumerable<T> items)
     {
@@ -33,7 +32,6 @@ public class InMemoryDataProvider<T> : IDataProvider<T>, IList<T>
 
     public void Sort(Comparison<T?> comparison)
     {
-        _comparison = comparison;
         _items.Sort(comparison);
         OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.Sorted));
     }
@@ -108,4 +106,47 @@ public class InMemoryDataProvider<T> : IDataProvider<T>, IList<T>
     {
         DataChanged?.Invoke(this, e);
     }
+
+    // IList (non-generic) implementation
+    object? IList.this[int index]
+    {
+        get => _items[index];
+        set
+        {
+            if (value is T t)
+                this[index] = t;
+            else
+                throw new ArgumentException($"Value must be of type {typeof(T).Name}", nameof(value));
+        }
+    }
+
+    bool IList.IsFixedSize => false;
+    bool ICollection.IsSynchronized => false;
+    object ICollection.SyncRoot => _items;
+
+    int IList.Add(object? value)
+    {
+        if (value is T t)
+        {
+            Add(t);
+            return _items.Count - 1;
+        }
+        throw new ArgumentException($"Value must be of type {typeof(T).Name}", nameof(value));
+    }
+
+    bool IList.Contains(object? value) => value is T t && Contains(t);
+    int IList.IndexOf(object? value) => value is T t ? IndexOf(t) : -1;
+    void IList.Insert(int index, object? value)
+    {
+        if (value is T t)
+            Insert(index, t);
+        else
+            throw new ArgumentException($"Value must be of type {typeof(T).Name}", nameof(value));
+    }
+    void IList.Remove(object? value)
+    {
+        if (value is T t)
+            Remove(t);
+    }
+    void ICollection.CopyTo(Array array, int index) => ((ICollection)_items).CopyTo(array, index);
 }

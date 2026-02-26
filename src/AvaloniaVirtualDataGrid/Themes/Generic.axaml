@@ -3,7 +3,7 @@
         xmlns:local="clr-namespace:AvaloniaVirtualDataGrid.Controls">
 
     <Style Selector="local|VirtualDataGrid">
-        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Background" Value="White" />
         <Setter Property="BorderBrush" Value="#FFCCCCCC" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="RowHeight" Value="32" />
@@ -36,9 +36,16 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </Border>
-                        <local:VirtualDataGridPanel Grid.Row="1" 
-                                                    x:Name="PART_ItemsPanel"
-                                                    RowHeight="{TemplateBinding RowHeight}" />
+                        <ScrollViewer Grid.Row="1" 
+                                      x:Name="PART_ScrollViewer"
+                                      Background="White"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto"
+                                      IsScrollChainingEnabled="False">
+                            <local:VirtualDataGridPanel x:Name="PART_ItemsPanel"
+                                                        Background="White"
+                                                        RowHeight="{TemplateBinding RowHeight}" />
+                        </ScrollViewer>
                     </Grid>
                 </Border>
             </ControlTemplate>
@@ -47,10 +54,12 @@
 
     <Style Selector="local|VirtualDataRow">
         <Setter Property="Height" Value="32" />
+        <Setter Property="Background" Value="Transparent" />
     </Style>
 
     <Style Selector="local|VirtualDataCell">
         <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Background" Value="Transparent" />
     </Style>
 
 </Styles>

@@ -12,18 +12,14 @@ using AvaloniaVirtualDataGrid.Core;
 
 namespace AvaloniaVirtualDataGrid.Controls;
 
-public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
+public class VirtualDataGridPanel : Panel
 {
-    private double _extentHeight;
-    private double _extentWidth;
-    private double _offsetX;
-    private double _offsetY;
-    private Size _viewport;
     private int _firstVisibleIndex;
-    private int _lastVisibleIndex;
+    private int _lastVisibleIndex = -1;
     private readonly Dictionary<int, Control> _containers = [];
     private IEnumerable? _itemsSource;
     private IList? _items;
+    private ScrollViewer? _scrollViewer;
 
     public static readonly StyledProperty<double> RowHeightProperty =
         AvaloniaProperty.Register<VirtualDataGridPanel, double>(nameof(RowHeight), 32.0);
@@ -61,96 +57,86 @@ public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
                 newCollection.CollectionChanged += OnItemsSourceCollectionChanged;
             }
 
+            _containers.Clear();
+            Children.Clear();
             InvalidateMeasure();
+            InvalidateArrange();
         }
     }
-
-    public Size Viewport => _viewport;
-
-    public Size Extent => new(_extentWidth, _extentHeight);
-
-    public Vector Offset
-    {
-        get => new(_offsetX, _offsetY);
-        set
-        {
-            var oldOffsetY = _offsetY;
-            _offsetX = Math.Max(0, Math.Min(value.X, _extentWidth - _viewport.Width));
-            _offsetY = Math.Max(0, Math.Min(value.Y, _extentHeight - _viewport.Height));
-
-            if (Math.Abs(oldOffsetY - _offsetY) > 0.5)
-            {
-                InvalidateArrange();
-                RaiseScrollInvalidated(EventArgs.Empty);
-            }
-        }
-    }
-
-    public bool CanHorizontallyScroll
-    {
-        get => true;
-        set { }
-    }
-
-    public bool CanVerticallyScroll
-    {
-        get => true;
-        set { }
-    }
-
-    public event EventHandler? ScrollInvalidated;
 
     public VirtualDataGridPanel()
     {
-        AddHandler(PointerWheelChangedEvent, OnPointerWheelChanged, RoutingStrategies.Tunnel);
+        Background = Avalonia.Media.Brushes.White;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        
+        if (_scrollViewer == null)
+        {
+            FindScrollViewer();
+        }
+    }
+
+    private void FindScrollViewer()
+    {
+        _scrollViewer = this.GetVisualAncestors().OfType<ScrollViewer>().FirstOrDefault();
+        if (_scrollViewer != null)
+        {
+            _scrollViewer.ScrollChanged += OnScrollChanged;
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        
+        if (_scrollViewer != null)
+        {
+            _scrollViewer.ScrollChanged -= OnScrollChanged;
+            _scrollViewer = null;
+        }
+    }
+
+    private void OnScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        InvalidateArrange();
     }
 
     private void OnItemsSourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         InvalidateMeasure();
-    }
-
-    private void OnPointerWheelChanged(object? sender, PointerWheelEventArgs e)
-    {
-        var deltaY = -e.Delta.Y * RowHeight * 3;
-        var deltaX = -e.Delta.X * 50;
-
-        Offset = new Vector(_offsetX + deltaX, _offsetY + deltaY);
-        e.Handled = true;
-    }
-
-    protected void RaiseScrollInvalidated(EventArgs e)
-    {
-        ScrollInvalidated?.Invoke(this, e);
+        InvalidateArrange();
     }
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        _viewport = availableSize;
-
-        if (_itemsSource is not Core.IDataProvider provider)
+        if (_itemsSource is not IDataProvider provider)
         {
-            _extentHeight = 0;
-            _extentWidth = 0;
             return new Size(0, 0);
         }
 
         var itemCount = provider.Count;
-        _extentHeight = itemCount * RowHeight;
-        _extentWidth = CalculateExtentWidth();
+        var extentHeight = itemCount * RowHeight;
+        var extentWidth = CalculateExtentWidth();
 
-        if (double.IsNaN(_extentWidth) || _extentWidth <= 0)
-            _extentWidth = 100;
+        if (double.IsNaN(extentWidth) || extentWidth <= 0)
+            extentWidth = 600;
 
         RecycleContainers();
 
         if (itemCount == 0)
-            return new Size(_extentWidth, 0);
+            return new Size(extentWidth, 0);
 
-        var firstVisible = (int)(_offsetY / RowHeight);
-        var visibleCount = !double.IsInfinity(availableSize.Height) && availableSize.Height > 0
-            ? (int)Math.Ceiling(availableSize.Height / RowHeight) + 2
-            : 20;
+        var offsetY = _scrollViewer?.Offset.Y ?? 0;
+        var viewportHeight = _scrollViewer?.Viewport.Height ?? availableSize.Height;
+        
+        if (double.IsInfinity(viewportHeight) || viewportHeight <= 0)
+            viewportHeight = 500;
+
+        var firstVisible = (int)(offsetY / RowHeight);
+        var visibleCount = (int)Math.Ceiling(viewportHeight / RowHeight) + 2;
 
         _firstVisibleIndex = Math.Max(0, firstVisible - 1);
         _lastVisibleIndex = Math.Min(itemCount - 1, firstVisible + visibleCount);
@@ -160,27 +146,27 @@ public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
             var container = GetOrCreateContainer(i);
             if (container != null)
             {
-                container.Measure(new Size(_extentWidth, RowHeight));
+                container.Measure(new Size(extentWidth, RowHeight));
             }
         }
 
-        return new Size(_extentWidth, _extentHeight);
+        return new Size(extentWidth, extentHeight);
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        if (_itemsSource is not Core.IDataProvider provider)
+        if (_itemsSource is not IDataProvider provider)
             return finalSize;
 
-        var arrangedWidth = Math.Max(finalSize.Width, _extentWidth);
+        var arrangedWidth = Math.Max(finalSize.Width, CalculateExtentWidth());
 
         for (var i = _firstVisibleIndex; i <= _lastVisibleIndex; i++)
         {
             var container = GetContainerFromIndex(i);
             if (container != null)
             {
-                var y = i * RowHeight - _offsetY;
-                var rect = new Rect(-_offsetX, y, arrangedWidth, RowHeight);
+                var y = i * RowHeight;
+                var rect = new Rect(0, y, arrangedWidth, RowHeight);
                 container.Arrange(rect);
             }
         }
@@ -195,14 +181,14 @@ public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
             double width = 0;
             foreach (var column in grid.Columns)
             {
-                column.CalculateActualWidth(_viewport.Width);
+                column.CalculateActualWidth(_scrollViewer?.Viewport.Width ?? 600);
                 width += column.ActualWidth;
             }
             if (width > 0)
                 return width;
         }
         
-        return !double.IsInfinity(_viewport.Width) && _viewport.Width > 0 ? _viewport.Width : 100;
+        return 600;
     }
 
     private Control? GetOrCreateContainer(int index)
@@ -211,12 +197,27 @@ public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
         if (container != null)
             return container;
 
-        container = CreateContainerForItem(index);
-        if (container != null)
+        var item = GetItemAtIndex(index);
+        if (item == null) 
+            return null;
+
+        if (ItemTemplate != null)
         {
-            AddInternalChild(container);
-            _containers[index] = container;
+            container = ItemTemplate.Build(item);
+            if (container != null)
+            {
+                container.DataContext = item;
+            }
         }
+
+        if (container == null)
+        {
+            container = new ContentControl { Content = item };
+        }
+
+        Children.Add(container);
+        _containers[index] = container;
+        
         return container;
     }
 
@@ -236,39 +237,15 @@ public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
         {
             if (_containers.TryGetValue(index, out var container))
             {
-                ClearContainerForItem(container);
-                RemoveInternalChild(container);
+                Children.Remove(container);
                 _containers.Remove(index);
             }
         }
     }
 
-    protected virtual Control? CreateContainerForItem(int index)
-    {
-        var item = GetItemAtIndex(index);
-        if (item == null) return null;
-
-        if (ItemTemplate != null)
-        {
-            var container = ItemTemplate.Build(item);
-            if (container != null)
-            {
-                container.DataContext = item;
-                return container;
-            }
-        }
-
-        return new ContentControl { Content = item };
-    }
-
-    protected virtual void ClearContainerForItem(Control container)
-    {
-        container.DataContext = null;
-    }
-
     private object? GetItemAtIndex(int index)
     {
-        if (_itemsSource is Core.IDataProvider provider && index >= 0 && index < provider.Count)
+        if (_itemsSource is IDataProvider provider && index >= 0 && index < provider.Count)
         {
             if (_items != null && index < _items.Count)
             {
@@ -281,49 +258,5 @@ public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
     private Control? GetContainerFromIndex(int index)
     {
         return _containers.TryGetValue(index, out var container) ? container : null;
-    }
-
-    protected override Control? ScrollIntoView(int index)
-    {
-        if (index < 0) return null;
-
-        var targetOffset = index * RowHeight;
-        var maxOffset = Math.Max(0, _extentHeight - _viewport.Height);
-
-        if (targetOffset < _offsetY)
-        {
-            Offset = new Vector(_offsetX, targetOffset);
-        }
-        else if (targetOffset + RowHeight > _offsetY + _viewport.Height)
-        {
-            Offset = new Vector(_offsetX, Math.Min(targetOffset, maxOffset));
-        }
-
-        return GetContainerFromIndex(index);
-    }
-
-    protected override Control? ContainerFromIndex(int index)
-    {
-        return GetContainerFromIndex(index);
-    }
-
-    protected override IEnumerable<Control> GetRealizedContainers()
-    {
-        return _containers.Values;
-    }
-
-    protected override int IndexFromContainer(Control container)
-    {
-        foreach (var kvp in _containers)
-        {
-            if (kvp.Value == container)
-                return kvp.Key;
-        }
-        return -1;
-    }
-
-    protected override Control? GetControl(NavigationDirection direction, IInputElement? from, bool wrap)
-    {
-        return null;
     }
 }
