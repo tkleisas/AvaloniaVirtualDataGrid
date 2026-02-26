@@ -36,13 +36,9 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </Border>
-                        <ScrollViewer Grid.Row="1" x:Name="PART_ScrollViewer"
-                                      Background="Transparent"
-                                      HorizontalScrollBarVisibility="Auto"
-                                      VerticalScrollBarVisibility="Auto">
-                            <local:VirtualDataGridPanel x:Name="PART_ItemsPanel"
-                                                        RowHeight="{TemplateBinding RowHeight}" />
-                        </ScrollViewer>
+                        <local:VirtualDataGridPanel Grid.Row="1" 
+                                                    x:Name="PART_ItemsPanel"
+                                                    RowHeight="{TemplateBinding RowHeight}" />
                     </Grid>
                 </Border>
             </ControlTemplate>

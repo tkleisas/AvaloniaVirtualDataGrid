@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -27,7 +28,7 @@ public class VirtualDataRow : ContentControl
         set => SetValue(IndexProperty, value);
     }
 
-    public ObservableCollection<VirtualDataCell> Cells { get; } = [];
+    public ObservableCollection<VirtualDataCell> Cells { get; }
 
     private readonly Grid _cellsGrid;
 
@@ -36,6 +37,12 @@ public class VirtualDataRow : ContentControl
         _cellsGrid = new Grid();
         Content = _cellsGrid;
 
+        Cells = [];
+        Cells.CollectionChanged += OnCellsCollectionChanged;
+    }
+
+    private void OnCellsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
         UpdateCellsLayout();
     }
 
@@ -50,7 +57,7 @@ public class VirtualDataRow : ContentControl
             {
                 Width = cell.Column?.Width > 0 
                     ? new GridLength(cell.Column.Width, GridUnitType.Pixel) 
-                    : GridLength.Auto,
+                    : new GridLength(100, GridUnitType.Pixel),
                 MinWidth = cell.Column?.MinWidth ?? 20,
                 MaxWidth = cell.Column?.MaxWidth ?? double.PositiveInfinity
             };
