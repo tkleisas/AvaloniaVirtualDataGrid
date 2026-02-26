@@ -54,6 +54,8 @@ public class VirtualDataRow : ContentControl
         _cellsGrid.ColumnDefinitions.Clear();
         _cellsGrid.Children.Clear();
 
+        var borderColor = new SolidColorBrush(Color.FromRgb(220, 220, 220));
+
         foreach (var cell in Cells)
         {
             var colDef = new ColumnDefinition
@@ -65,6 +67,9 @@ public class VirtualDataRow : ContentControl
                 MaxWidth = cell.Column?.MaxWidth ?? double.PositiveInfinity
             };
             _cellsGrid.ColumnDefinitions.Add(colDef);
+
+            cell.BorderBrush = borderColor;
+            cell.BorderThickness = new Thickness(0, 0, 1, 0);
 
             Grid.SetColumn(cell, _cellsGrid.ColumnDefinitions.Count - 1);
             _cellsGrid.Children.Add(cell);
