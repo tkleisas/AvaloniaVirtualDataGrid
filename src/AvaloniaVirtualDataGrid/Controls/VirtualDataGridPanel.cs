@@ -101,6 +101,7 @@ public class VirtualDataGridPanel : Panel
 
     private void OnScrollChanged(object? sender, ScrollChangedEventArgs e)
     {
+        InvalidateMeasure();
         InvalidateArrange();
     }
 
