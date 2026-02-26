@@ -8,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.VisualTree;
+using AvaloniaVirtualDataGrid.Core;
 
 namespace AvaloniaVirtualDataGrid.Controls;
 
@@ -127,21 +128,29 @@ public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
     {
         _viewport = availableSize;
 
-        if (_itemsSource is not IDataProvider provider)
+        if (_itemsSource is not Core.IDataProvider provider)
         {
             _extentHeight = 0;
-            _extentWidth = availableSize.Width;
-            return base.MeasureOverride(availableSize);
+            _extentWidth = 0;
+            return new Size(0, 0);
         }
 
         var itemCount = provider.Count;
         _extentHeight = itemCount * RowHeight;
         _extentWidth = CalculateExtentWidth();
 
+        if (double.IsNaN(_extentWidth) || _extentWidth <= 0)
+            _extentWidth = 100;
+
         RecycleContainers();
 
+        if (itemCount == 0)
+            return new Size(_extentWidth, 0);
+
         var firstVisible = (int)(_offsetY / RowHeight);
-        var visibleCount = (int)Math.Ceiling(availableSize.Height / RowHeight) + 2;
+        var visibleCount = !double.IsInfinity(availableSize.Height) && availableSize.Height > 0
+            ? (int)Math.Ceiling(availableSize.Height / RowHeight) + 2
+            : 20;
 
         _firstVisibleIndex = Math.Max(0, firstVisible - 1);
         _lastVisibleIndex = Math.Min(itemCount - 1, firstVisible + visibleCount);
@@ -155,12 +164,12 @@ public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
             }
         }
 
-        return availableSize;
+        return new Size(_extentWidth, _extentHeight);
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        if (_itemsSource is not IDataProvider provider)
+        if (_itemsSource is not Core.IDataProvider provider)
             return finalSize;
 
         var arrangedWidth = Math.Max(finalSize.Width, _extentWidth);
@@ -186,11 +195,14 @@ public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
             double width = 0;
             foreach (var column in grid.Columns)
             {
+                column.CalculateActualWidth(_viewport.Width);
                 width += column.ActualWidth;
             }
-            return Math.Max(width, _viewport.Width);
+            if (width > 0)
+                return width;
         }
-        return _viewport.Width;
+        
+        return !double.IsInfinity(_viewport.Width) && _viewport.Width > 0 ? _viewport.Width : 100;
     }
 
     private Control? GetOrCreateContainer(int index)
@@ -256,7 +268,7 @@ public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
 
     private object? GetItemAtIndex(int index)
     {
-        if (_itemsSource is IDataProvider provider && index >= 0 && index < provider.Count)
+        if (_itemsSource is Core.IDataProvider provider && index >= 0 && index < provider.Count)
         {
             if (_items != null && index < _items.Count)
             {
@@ -314,9 +326,4 @@ public class VirtualDataGridPanel : VirtualizingPanel, IScrollable
     {
         return null;
     }
-}
-
-internal interface IDataProvider
-{
-    int Count { get; }
 }

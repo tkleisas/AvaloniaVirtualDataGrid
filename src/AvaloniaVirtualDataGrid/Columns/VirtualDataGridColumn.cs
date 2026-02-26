@@ -2,8 +2,6 @@ using System.Collections;
 using System.Collections.Specialized;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
-using Avalonia.Input;
 using Avalonia.Layout;
 
 namespace AvaloniaVirtualDataGrid.Controls;
@@ -117,73 +115,6 @@ public abstract class VirtualDataGridColumn : AvaloniaObject
     public virtual void CommitEdit(Control editControl, object? item) { }
 }
 
-public class VirtualDataGridColumnCollection : IList<VirtualDataGridColumn>, INotifyCollectionChanged
+public class VirtualDataGridColumnCollection : System.Collections.ObjectModel.ObservableCollection<VirtualDataGridColumn>
 {
-    private readonly List<VirtualDataGridColumn> _items = [];
-
-    public event NotifyCollectionChangedEventHandler? CollectionChanged;
-
-    public VirtualDataGridColumn this[int index]
-    {
-        get => _items[index];
-        set
-        {
-            var oldItem = _items[index];
-            _items[index] = value;
-            value.Owner = oldItem.Owner;
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, value, oldItem, index));
-        }
-    }
-
-    public int Count => _items.Count;
-    public bool IsReadOnly => false;
-
-    public void Add(VirtualDataGridColumn item)
-    {
-        _items.Add(item);
-        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, _items.Count - 1));
-    }
-
-    public void Clear()
-    {
-        _items.Clear();
-        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-    }
-
-    public bool Contains(VirtualDataGridColumn item) => _items.Contains(item);
-    public void CopyTo(VirtualDataGridColumn[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);
-    public IEnumerator<VirtualDataGridColumn> GetEnumerator() => _items.GetEnumerator();
-    public int IndexOf(VirtualDataGridColumn item) => _items.IndexOf(item);
-
-    public void Insert(int index, VirtualDataGridColumn item)
-    {
-        _items.Insert(index, item);
-        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
-    }
-
-    public bool Remove(VirtualDataGridColumn item)
-    {
-        var index = _items.IndexOf(item);
-        if (index >= 0)
-        {
-            _items.RemoveAt(index);
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
-            return true;
-        }
-        return false;
-    }
-
-    public void RemoveAt(int index)
-    {
-        var item = _items[index];
-        _items.RemoveAt(index);
-        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
-    }
-
-    IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
-
-    protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
-    {
-        CollectionChanged?.Invoke(this, e);
-    }
 }

@@ -80,7 +80,7 @@ public class VirtualDataGrid : TemplatedControl
     public VirtualDataGrid()
     {
         _columns = new VirtualDataGridColumnCollection();
-        _columns.CollectionChanged += OnColumnsCollectionChanged;
+        _columns.CollectionChanged += (s, e) => OnColumnsCollectionChanged(s, e);
     }
 
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
