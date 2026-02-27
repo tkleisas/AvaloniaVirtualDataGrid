@@ -217,51 +217,23 @@ public class VirtualDataGrid : TemplatedControl
         
         CommitEdit();
         
-        if (cell.Column?.CreateEditContent(cell.DataContext) is Control editControl)
-        {
-            _editingCell = cell;
-            cell.IsEditing = true;
-            cell.Content = editControl;
-            
-            if (editControl is TextBox textBox)
-            {
-                textBox.Focus();
-                textBox.SelectAll();
-            }
-        }
+        _editingCell = cell;
+        cell.IsEditing = true;
     }
 
     public void CommitEdit()
     {
         if (_editingCell == null) return;
-
-        var cell = _editingCell;
-        var column = cell.Column;
-        var dataContext = cell.DataContext;
-
-        if (column != null && dataContext != null)
-        {
-            var editContent = cell.Content as Control;
-            column.CommitEdit(editContent!, dataContext);
-        }
-
-        cell.IsEditing = false;
-        cell.Content = null;
-        cell.Content = column?.CreateCellContent(dataContext);
+        
+        _editingCell.CommitEdit();
         _editingCell = null;
     }
 
     public void CancelEdit()
     {
         if (_editingCell == null) return;
-
-        var cell = _editingCell;
-        var column = cell.Column;
-        var dataContext = cell.DataContext;
-
-        cell.IsEditing = false;
-        cell.Content = null;
-        cell.Content = column?.CreateCellContent(dataContext);
+        
+        _editingCell.CancelEdit();
         _editingCell = null;
     }
 

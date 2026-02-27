@@ -47,8 +47,8 @@ public class VirtualDataCell : ContentControl
         }
     }
 
-    private Control? _displayContent;
     private Control? _editContent;
+    private bool _isInternalEdit;
 
     public VirtualDataCell()
     {
@@ -76,21 +76,27 @@ public class VirtualDataCell : ContentControl
 
     internal void UpdateCell()
     {
-        if (Column == null || DataContext == null)
+        if (Column == null || DataContext == null || IsEditing)
             return;
 
-        _displayContent = Column.CreateCellContent(DataContext);
-        Content = _displayContent;
+        _isInternalEdit = true;
+        Content = Column.CreateCellContent(DataContext);
+        _isInternalEdit = false;
     }
 
     private void UpdateEditingState()
     {
+        if (_isInternalEdit) return;
+
         if (IsEditing && Column != null && DataContext != null)
         {
             _editContent = Column.CreateEditContent(DataContext);
             if (_editContent != null)
             {
+                _isInternalEdit = true;
                 Content = _editContent;
+                _isInternalEdit = false;
+                
                 if (_editContent is TextBox textBox)
                 {
                     textBox.Focus();
@@ -107,8 +113,14 @@ public class VirtualDataCell : ContentControl
                 textBox.LostFocus -= OnEditLostFocus;
                 textBox.KeyDown -= OnEditKeyDown;
             }
-            Content = _displayContent;
             _editContent = null;
+            
+            if (Column != null && DataContext != null)
+            {
+                _isInternalEdit = true;
+                Content = Column.CreateCellContent(DataContext);
+                _isInternalEdit = false;
+            }
         }
     }
 
@@ -131,17 +143,19 @@ public class VirtualDataCell : ContentControl
         }
     }
 
-    private void CommitEdit()
+    public void CommitEdit()
     {
         if (Column != null && DataContext != null && _editContent != null)
         {
             Column.CommitEdit(_editContent, DataContext);
+            _editContent = null;
         }
         IsEditing = false;
     }
 
-    private void CancelEdit()
+    public void CancelEdit()
     {
+        _editContent = null;
         IsEditing = false;
     }
 
