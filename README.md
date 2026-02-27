@@ -197,6 +197,31 @@ Implement `IDataProvider<T>` for:
 - File streaming
 - Any custom async data source
 
+### Async Data Provider
+
+For large datasets or remote data sources, use `AsyncDataProvider<T>`:
+
+```csharp
+var asyncProvider = new AsyncDataProvider<Person>(
+    async (start, count, ct) => await api.FetchPeopleAsync(start, count, ct),
+    async () => await api.GetTotalCountAsync()
+);
+
+grid.ItemsSource = asyncProvider;
+```
+
+Features:
+- **Caching** - Recently accessed data is cached in memory
+- **Prefetch** - Data ahead of visible area is loaded in background
+- **Loading placeholders** - Shows loading template while fetching
+- **Cancellation** - In-flight requests are cancelled on scroll
+
+```csharp
+// Customize loading placeholder
+grid.LoadingTemplate = new FuncDataTemplate<int>((index, _) =>
+    new TextBlock { Text = "Loading...", Foreground = Brushes.Gray });
+```
+
 ## Performance
 
 | Rows | Memory (approx) | Scroll FPS |
@@ -228,8 +253,8 @@ The demo includes:
 - [x] In-place editing with type conversion
 - [x] Column resize/reorder
 - [x] Sorting
+- [x] Async data loading with caching
 - [ ] Frozen columns
-- [ ] Async data loading with caching
 
 ---
 

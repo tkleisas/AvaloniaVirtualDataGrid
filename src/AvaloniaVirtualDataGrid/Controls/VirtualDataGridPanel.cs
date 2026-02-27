@@ -7,6 +7,7 @@ using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using AvaloniaVirtualDataGrid.Core;
 
@@ -17,15 +18,20 @@ public class VirtualDataGridPanel : Panel
     private int _firstVisibleIndex;
     private int _lastVisibleIndex = -1;
     private readonly Dictionary<int, Control> _containers = [];
+    private readonly HashSet<int> _loadingIndices = [];
     private IEnumerable? _itemsSource;
     private IList? _items;
     private ScrollViewer? _scrollViewer;
+    private int _prefetchBuffer = 50;
 
     public static readonly StyledProperty<double> RowHeightProperty =
         AvaloniaProperty.Register<VirtualDataGridPanel, double>(nameof(RowHeight), 32.0);
 
     public static readonly StyledProperty<IDataTemplate?> ItemTemplateProperty =
         AvaloniaProperty.Register<VirtualDataGridPanel, IDataTemplate?>(nameof(ItemTemplate));
+
+    public static readonly StyledProperty<IDataTemplate?> LoadingTemplateProperty =
+        AvaloniaProperty.Register<VirtualDataGridPanel, IDataTemplate?>(nameof(LoadingTemplate));
 
     public double RowHeight
     {
@@ -37,6 +43,18 @@ public class VirtualDataGridPanel : Panel
     {
         get => GetValue(ItemTemplateProperty);
         set => SetValue(ItemTemplateProperty, value);
+    }
+
+    public IDataTemplate? LoadingTemplate
+    {
+        get => GetValue(LoadingTemplateProperty);
+        set => SetValue(LoadingTemplateProperty, value);
+    }
+
+    public int PrefetchBuffer
+    {
+        get => _prefetchBuffer;
+        set => _prefetchBuffer = value;
     }
 
     public IEnumerable? ItemsSource
@@ -75,6 +93,7 @@ public class VirtualDataGridPanel : Panel
     private void OnDataProviderDataChanged(object? sender, DataProviderChangedEventArgs e)
     {
         _containers.Clear();
+        _loadingIndices.Clear();
         Children.Clear();
         _firstVisibleIndex = 0;
         _lastVisibleIndex = -1;
@@ -84,7 +103,7 @@ public class VirtualDataGridPanel : Panel
 
     public VirtualDataGridPanel()
     {
-        Background = Avalonia.Media.Brushes.White;
+        Background = Brushes.White;
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -169,7 +188,23 @@ public class VirtualDataGridPanel : Panel
             }
         }
 
+        PrefetchData(firstVisible, visibleCount);
+
         return new Size(extentWidth, extentHeight);
+    }
+
+    private void PrefetchData(int firstVisible, int visibleCount)
+    {
+        if (_itemsSource is not AsyncDataProvider<object> asyncProvider)
+            return;
+
+        var prefetchStart = Math.Max(0, firstVisible + visibleCount);
+        var prefetchEnd = Math.Min(asyncProvider.Count - 1, prefetchStart + _prefetchBuffer);
+
+        if (prefetchStart <= prefetchEnd)
+        {
+            asyncProvider.Prefetch(prefetchStart, prefetchEnd - prefetchStart + 1);
+        }
     }
 
     protected override Size ArrangeOverride(Size finalSize)
@@ -224,8 +259,22 @@ public class VirtualDataGridPanel : Panel
         }
 
         var item = GetItemAtIndex(index);
-        if (item == null) 
+        
+        if (item == null)
+        {
+            if (_loadingIndices.Contains(index))
+            {
+                return CreateLoadingContainer(index);
+            }
+
+            if (_itemsSource is IDataProvider provider && index >= 0 && index < provider.Count)
+            {
+                TriggerAsyncLoad(index);
+                return CreateLoadingContainer(index);
+            }
+
             return null;
+        }
 
         if (ItemTemplate != null)
         {
@@ -250,6 +299,77 @@ public class VirtualDataGridPanel : Panel
         _containers[index] = container;
         
         return container;
+    }
+
+    private Control CreateLoadingContainer(int index)
+    {
+        Control container;
+        
+        if (LoadingTemplate != null)
+        {
+            container = LoadingTemplate.Build(index);
+        }
+        else
+        {
+            container = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
+                Child = new TextBlock
+                {
+                    Text = "Loading...",
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Foreground = new SolidColorBrush(Color.FromRgb(150, 150, 150))
+                }
+            };
+        }
+
+        if (container is VirtualDataRow row)
+        {
+            row.Index = index;
+        }
+
+        Children.Add(container);
+        _containers[index] = container;
+        
+        return container;
+    }
+
+    private void TriggerAsyncLoad(int index)
+    {
+        if (_loadingIndices.Contains(index))
+            return;
+
+        _loadingIndices.Add(index);
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                if (_itemsSource is IDataProvider provider && _items != null)
+                {
+                    var count = Math.Min(50, provider.Count - index);
+                    if (count > 0 && _items is IDataProvider<object> asyncProvider)
+                    {
+                        await asyncProvider.GetRangeAsync(index, count);
+                    }
+                }
+            }
+            finally
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    _loadingIndices.Remove(index);
+                    if (_containers.TryGetValue(index, out var container))
+                    {
+                        Children.Remove(container);
+                        _containers.Remove(index);
+                    }
+                    InvalidateMeasure();
+                    InvalidateArrange();
+                });
+            }
+        });
     }
 
     private void UpdateRowSelectionState(VirtualDataRow row, int index)
