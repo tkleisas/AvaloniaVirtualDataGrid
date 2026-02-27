@@ -8,6 +8,9 @@ A high-performance virtualized DataGrid control for AvaloniaUI, designed to hand
 - **Data Virtualization** - `IDataProvider<T>` interface for async/on-demand data loading
 - **Row Selection** - Single and multiple selection with Ctrl/Shift support
 - **In-place Editing** - Double-click or F2 to edit, Enter/Escape to commit/cancel
+- **Column Resize** - Drag column header edges to resize columns
+- **Column Reorder** - Drag column headers to reorder columns
+- **Sorting** - Click headers to sort ascending/descending/none with visual indicators
 - **Column Types** - Text columns with type conversion and template columns for custom content
 - **SQLite Support** - Demo includes WAL-mode SQLite backend for persistent storage
 - **Smooth Scrolling** - Efficient container recycling for butter-smooth scroll performance
@@ -131,6 +134,30 @@ var selectedIndices = grid.SelectedIndices;
 - **Escape** - Cancel edit
 - **Tab** - Commit and move to next cell
 
+## Column Resize & Reorder
+
+**Resize:**
+- Drag the right edge of any column header to resize
+- MinWidth and MaxWidth constraints are respected
+
+**Reorder:**
+- Drag column headers left/right to reorder columns
+- The `ColumnReordered` event fires when a column is moved
+
+## Sorting
+
+- Click any column header to cycle through: **none → ascending → descending → none**
+- Sort indicators (▲/▼) appear in sorted column headers
+- Implement `IDataProvider.Sort(propertyName, direction)` for custom sorting
+
+```csharp
+grid.Sorting += (sender, e) =>
+{
+    // Custom sort logic
+    e.Handled = true; // Set to true to prevent default sorting
+};
+```
+
 ## Architecture
 
 ```
@@ -150,11 +177,17 @@ VirtualDataGrid (main control)
 ### Data Provider Interface
 
 ```csharp
-public interface IDataProvider<T>
+public interface IDataProvider
 {
     int Count { get; }
-    ValueTask<IReadOnlyList<T>> GetRangeAsync(int startIndex, int count, CancellationToken ct = default);
+    void Sort(string? propertyName, ListSortDirection direction);
+    IReadOnlyList<SortDescription> SortDescriptions { get; }
     event EventHandler<DataProviderChangedEventArgs>? DataChanged;
+}
+
+public interface IDataProvider<T> : IDataProvider
+{
+    ValueTask<IReadOnlyList<T>> GetRangeAsync(int startIndex, int count, CancellationToken ct = default);
 }
 ```
 
@@ -193,8 +226,8 @@ The demo includes:
 - [x] Column definitions (Text, Template)
 - [x] Row/cell selection (Single, Multiple)
 - [x] In-place editing with type conversion
-- [ ] Column resize/reorder
-- [ ] Sorting
+- [x] Column resize/reorder
+- [x] Sorting
 - [ ] Frozen columns
 - [ ] Async data loading with caching
 

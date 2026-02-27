@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -11,6 +12,13 @@ public class VirtualDataGridTextColumn : VirtualDataGridColumn
 {
     private Func<object?, object?>? _getter;
     private Action<object?, object?>? _setter;
+    private string? _sortMemberPath;
+
+    public string? SortMemberPath
+    {
+        get => _sortMemberPath;
+        set => _sortMemberPath = value;
+    }
 
     public VirtualDataGridTextColumn()
     {
@@ -33,22 +41,27 @@ public class VirtualDataGridTextColumn : VirtualDataGridColumn
     {
         var getter = propertyExpression.Compile();
         Action<object?, object?>? setter = null;
+        string? sortMemberPath = null;
 
-        // Handle both direct member access and conversion (when property type is value type cast to object)
         MemberExpression? memberExpr = propertyExpression.Body as MemberExpression;
         
-        // If it's a conversion (e.g., string -> object), get the operand
         if (memberExpr == null && propertyExpression.Body is UnaryExpression unaryExpr && unaryExpr.NodeType == ExpressionType.Convert)
         {
             memberExpr = unaryExpr.Operand as MemberExpression;
         }
 
-        if (memberExpr?.Member is System.Reflection.PropertyInfo propInfo && propInfo.CanWrite)
+        PropertyInfo? propInfo = null;
+        if (memberExpr?.Member is PropertyInfo pi)
+        {
+            propInfo = pi;
+            sortMemberPath = pi.Name;
+        }
+
+        if (propInfo != null && propInfo.CanWrite)
         {
             var param = Expression.Parameter(typeof(object), "value");
             Expression valueExpr = param;
             
-            // Convert the value to the property type
             if (propInfo.PropertyType != typeof(object))
             {
                 valueExpr = Expression.Convert(param, propInfo.PropertyType);
@@ -61,6 +74,7 @@ public class VirtualDataGridTextColumn : VirtualDataGridColumn
 
         var column = new VirtualDataGridTextColumn(header, obj => obj is T t ? getter(t) : null);
         column._setter = setter;
+        column._sortMemberPath = sortMemberPath;
         return column;
     }
 

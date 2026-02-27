@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using AvaloniaVirtualDataGrid.Core;
 
 namespace AvaloniaVirtualDataGrid.Controls;
 
@@ -31,6 +32,9 @@ public abstract class VirtualDataGridColumn : AvaloniaObject
 
     public static readonly StyledProperty<HorizontalAlignment> HorizontalContentAlignmentProperty =
         AvaloniaProperty.Register<VirtualDataGridColumn, HorizontalAlignment>(nameof(HorizontalContentAlignment), HorizontalAlignment.Left);
+
+    public static readonly StyledProperty<ListSortDirection?> SortDirectionProperty =
+        AvaloniaProperty.Register<VirtualDataGridColumn, ListSortDirection?>(nameof(SortDirection));
 
     public string Header
     {
@@ -78,6 +82,12 @@ public abstract class VirtualDataGridColumn : AvaloniaObject
     {
         get => GetValue(HorizontalContentAlignmentProperty);
         set => SetValue(HorizontalContentAlignmentProperty, value);
+    }
+
+    public ListSortDirection? SortDirection
+    {
+        get => GetValue(SortDirectionProperty);
+        set => SetValue(SortDirectionProperty, value);
     }
 
     internal VirtualDataGrid? Owner { get; set; }

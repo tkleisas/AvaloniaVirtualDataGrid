@@ -17,6 +17,7 @@ public class VirtualDataGrid : TemplatedControl
 {
     private VirtualDataGridPanel? _itemsPanel;
     private ScrollViewer? _scrollViewer;
+    private VirtualDataGridHeaderPanel? _headerPanel;
     private readonly SelectionService _selectionService;
     private IList? _items;
     private VirtualDataCell? _editingCell;
@@ -86,6 +87,7 @@ public class VirtualDataGrid : TemplatedControl
     public event EventHandler<RoutedEventArgs>? RowDoubleClick;
     public event EventHandler<RoutedEventArgs>? CellClick;
     public event EventHandler<CellEditEventArgs>? CellEditCompleted;
+    public event EventHandler<DataGridSortingEventArgs>? Sorting;
 
     static VirtualDataGrid()
     {
@@ -110,6 +112,7 @@ public class VirtualDataGrid : TemplatedControl
 
         _scrollViewer = e.NameScope.Find<ScrollViewer>("PART_ScrollViewer");
         _itemsPanel = e.NameScope.Find<VirtualDataGridPanel>("PART_ItemsPanel");
+        _headerPanel = e.NameScope.Find<VirtualDataGridHeaderPanel>("PART_HeaderPanel");
 
         if (_scrollViewer != null)
         {
@@ -122,9 +125,29 @@ public class VirtualDataGrid : TemplatedControl
             UpdatePanelItemsSource();
         }
 
+        if (_headerPanel != null)
+        {
+            _headerPanel.ColumnReordered += OnColumnReordered;
+            _headerPanel.HeaderClicked += OnHeaderClicked;
+        }
+
         SyncColumnWidths();
         
         AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
+    }
+
+    private void OnColumnReordered(object? sender, ColumnReorderedEventArgs e)
+    {
+        if (_itemsPanel != null)
+        {
+            _itemsPanel.ItemTemplate = CreateItemTemplate();
+            _itemsPanel.InvalidateMeasure();
+        }
+    }
+
+    private void OnHeaderClicked(object? sender, ColumnHeaderClickedEventArgs e)
+    {
+        OnColumnHeaderClick(e.Column);
     }
 
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -398,6 +421,47 @@ public class VirtualDataGrid : TemplatedControl
         UpdateRowSelectionStates();
     }
 
+    internal void OnColumnHeaderClick(VirtualDataGridColumn column)
+    {
+        if (!column.IsSortable) return;
+
+        var sortMemberPath = (column as Columns.VirtualDataGridTextColumn)?.SortMemberPath ?? column.Header;
+        
+        var args = new DataGridSortingEventArgs(column, sortMemberPath);
+        Sorting?.Invoke(this, args);
+        
+        if (args.Handled) return;
+
+        Core.ListSortDirection? newDirection = column.SortDirection switch
+        {
+            null => Core.ListSortDirection.Ascending,
+            Core.ListSortDirection.Ascending => Core.ListSortDirection.Descending,
+            _ => null
+        };
+
+        foreach (var col in Columns)
+        {
+            col.SortDirection = null;
+        }
+
+        column.SortDirection = newDirection;
+        _headerPanel?.RebuildHeaders();
+
+        if (ItemsSource is Core.IDataProvider provider && newDirection.HasValue)
+        {
+            provider.Sort(sortMemberPath, newDirection.Value);
+        }
+        else if (ItemsSource is Core.IDataProvider providerNoSort)
+        {
+            providerNoSort.Sort(null, Core.ListSortDirection.Ascending);
+        }
+
+        if (_itemsPanel != null)
+        {
+            _itemsPanel.InvalidateMeasure();
+        }
+    }
+
     internal void OnCellEdited(VirtualDataCell cell, object? oldValue, object? newValue)
     {
         if (cell.Column == null || cell.DataContext == null) return;
@@ -437,5 +501,18 @@ public class CellEditEventArgs : EventArgs
         ColumnName = columnName;
         OldValue = oldValue;
         NewValue = newValue;
+    }
+}
+
+public class DataGridSortingEventArgs : EventArgs
+{
+    public VirtualDataGridColumn Column { get; }
+    public string SortMemberPath { get; }
+    public bool Handled { get; set; }
+
+    public DataGridSortingEventArgs(VirtualDataGridColumn column, string sortMemberPath)
+    {
+        Column = column;
+        SortMemberPath = sortMemberPath;
     }
 }

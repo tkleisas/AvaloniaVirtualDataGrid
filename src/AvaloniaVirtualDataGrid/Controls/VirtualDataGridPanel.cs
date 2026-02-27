@@ -48,6 +48,10 @@ public class VirtualDataGridPanel : Panel
             {
                 oldCollection.CollectionChanged -= OnItemsSourceCollectionChanged;
             }
+            if (_itemsSource is IDataProvider oldProvider)
+            {
+                oldProvider.DataChanged -= OnDataProviderDataChanged;
+            }
 
             _itemsSource = value;
             _items = value as IList;
@@ -56,12 +60,26 @@ public class VirtualDataGridPanel : Panel
             {
                 newCollection.CollectionChanged += OnItemsSourceCollectionChanged;
             }
+            if (_itemsSource is IDataProvider newProvider)
+            {
+                newProvider.DataChanged += OnDataProviderDataChanged;
+            }
 
             _containers.Clear();
             Children.Clear();
             InvalidateMeasure();
             InvalidateArrange();
         }
+    }
+
+    private void OnDataProviderDataChanged(object? sender, DataProviderChangedEventArgs e)
+    {
+        _containers.Clear();
+        Children.Clear();
+        _firstVisibleIndex = 0;
+        _lastVisibleIndex = -1;
+        InvalidateMeasure();
+        InvalidateArrange();
     }
 
     public VirtualDataGridPanel()

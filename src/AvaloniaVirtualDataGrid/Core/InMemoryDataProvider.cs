@@ -1,14 +1,18 @@
 using System.Collections;
+using System.Linq.Expressions;
 
 namespace AvaloniaVirtualDataGrid.Core;
 
 public class InMemoryDataProvider<T> : IDataProvider<T>, IList, IList<T>
 {
     private readonly List<T> _items;
+    private readonly List<T> _originalItems;
+    private readonly List<SortDescription> _sortDescriptions = [];
 
     public InMemoryDataProvider(IEnumerable<T> items)
     {
         _items = new List<T>(items);
+        _originalItems = new List<T>(items);
     }
 
     public InMemoryDataProvider() : this([])
@@ -19,6 +23,8 @@ public class InMemoryDataProvider<T> : IDataProvider<T>, IList, IList<T>
 
     public event EventHandler<DataProviderChangedEventArgs>? DataChanged;
 
+    public IReadOnlyList<SortDescription> SortDescriptions => _sortDescriptions;
+
     public ValueTask<IReadOnlyList<T>> GetRangeAsync(int startIndex, int count, CancellationToken cancellationToken = default)
     {
         if (startIndex < 0 || startIndex >= _items.Count)
@@ -28,6 +34,61 @@ public class InMemoryDataProvider<T> : IDataProvider<T>, IList, IList<T>
         var result = new T[actualCount];
         _items.CopyTo(startIndex, result, 0, actualCount);
         return new ValueTask<IReadOnlyList<T>>(result);
+    }
+
+    public void Sort(string? propertyName, ListSortDirection direction)
+    {
+        if (string.IsNullOrEmpty(propertyName))
+        {
+            _sortDescriptions.Clear();
+            _items.Clear();
+            _items.AddRange(_originalItems);
+        }
+        else
+        {
+            var existingIndex = _sortDescriptions.FindIndex(sd => sd.PropertyName == propertyName);
+            if (existingIndex >= 0)
+            {
+                _sortDescriptions.RemoveAt(existingIndex);
+            }
+            _sortDescriptions.Insert(0, new SortDescription(propertyName, direction));
+
+            ApplySorting();
+        }
+
+        OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.Sorted));
+    }
+
+    private void ApplySorting()
+    {
+        if (_sortDescriptions.Count == 0)
+        {
+            _items.Clear();
+            _items.AddRange(_originalItems);
+            return;
+        }
+
+        var sorted = _originalItems.AsEnumerable();
+
+        foreach (var sortDesc in _sortDescriptions)
+        {
+            var propertyName = sortDesc.PropertyName;
+            var prop = typeof(T).GetProperty(propertyName!);
+            if (prop == null) continue;
+
+            var param = Expression.Parameter(typeof(T), "x");
+            var access = Expression.Property(param, prop);
+            var lambda = Expression.Lambda<Func<T, object?>>(Expression.Convert(access, typeof(object)), param);
+            var getter = lambda.Compile();
+
+            var currentSorted = sorted;
+            sorted = sortDesc.Direction == ListSortDirection.Ascending
+                ? currentSorted.OrderBy(getter)
+                : currentSorted.OrderByDescending(getter);
+        }
+
+        _items.Clear();
+        _items.AddRange(sorted);
     }
 
     public void Sort(Comparison<T?> comparison)
@@ -46,6 +107,9 @@ public class InMemoryDataProvider<T> : IDataProvider<T>, IList, IList<T>
     {
         _items.Clear();
         _items.AddRange(newItems);
+        _originalItems.Clear();
+        _originalItems.AddRange(newItems);
+        _sortDescriptions.Clear();
         OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.Reset));
     }
 

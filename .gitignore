@@ -86,5 +86,10 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
 # opencode plans (optional - remove if you want to track)
 # .opencode/

@@ -4,11 +4,31 @@ public interface IDataProvider
 {
     int Count { get; }
     event EventHandler<DataProviderChangedEventArgs>? DataChanged;
+    void Sort(string? propertyName, ListSortDirection direction);
+    IReadOnlyList<SortDescription> SortDescriptions { get; }
 }
 
 public interface IDataProvider<T> : IDataProvider
 {
     ValueTask<IReadOnlyList<T>> GetRangeAsync(int startIndex, int count, CancellationToken cancellationToken = default);
+}
+
+public class SortDescription
+{
+    public string? PropertyName { get; }
+    public ListSortDirection Direction { get; }
+
+    public SortDescription(string? propertyName, ListSortDirection direction)
+    {
+        PropertyName = propertyName;
+        Direction = direction;
+    }
+}
+
+public enum ListSortDirection
+{
+    Ascending,
+    Descending
 }
 
 public class DataProviderChangedEventArgs : EventArgs

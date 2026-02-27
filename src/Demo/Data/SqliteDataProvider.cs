@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Specialized;
-using System.ComponentModel;
 using Microsoft.Data.Sqlite;
 using AvaloniaVirtualDataGrid.Core;
 
@@ -10,11 +9,13 @@ public class SqliteDataProvider : IDataProvider, IList
 {
     private readonly SqliteConnection _connection;
     private int _count = -1;
-    private readonly Dictionary<int, PersonRecord> _cache = [];
-    private readonly HashSet<int> _loadedRanges = [];
+    private readonly List<SortDescription> _sortDescriptions = [];
+    private string _orderByClause = "";
 
     public event EventHandler<DataProviderChangedEventArgs>? DataChanged;
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
+
+    public IReadOnlyList<SortDescription> SortDescriptions => _sortDescriptions;
 
     public SqliteDataProvider(string dbPath)
     {
@@ -94,8 +95,6 @@ public class SqliteDataProvider : IDataProvider, IList
 
         transaction.Commit();
         _count = -1;
-        _cache.Clear();
-        _loadedRanges.Clear();
         
         OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.Reset));
     }
@@ -116,18 +115,49 @@ public class SqliteDataProvider : IDataProvider, IList
 
     public int RowCount => Count;
 
+    public void Sort(string? propertyName, ListSortDirection direction)
+    {
+        _sortDescriptions.Clear();
+
+        if (string.IsNullOrEmpty(propertyName))
+        {
+            _orderByClause = "";
+        }
+        else
+        {
+            _sortDescriptions.Add(new SortDescription(propertyName, direction));
+            var directionStr = direction == ListSortDirection.Ascending ? "ASC" : "DESC";
+            _orderByClause = $"ORDER BY {propertyName} {directionStr}";
+        }
+
+        OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.Sorted));
+    }
+
     public ValueTask<IReadOnlyList<PersonRecord>> GetRangeAsync(int startIndex, int count, CancellationToken cancellationToken = default)
     {
         var result = new List<PersonRecord>(count);
 
         using var cmd = _connection.CreateCommand();
-        cmd.CommandText = @"
-            SELECT Id, FirstName, LastName, Email, Age, City, Progress
-            FROM People
-            WHERE Id >= $start AND Id < $end
-            ORDER BY Id";
         
-        cmd.Parameters.AddWithValue("$start", startIndex + 1);
+        if (string.IsNullOrEmpty(_orderByClause))
+        {
+            cmd.CommandText = @"
+                SELECT Id, FirstName, LastName, Email, Age, City, Progress
+                FROM People
+                WHERE Id >= $start AND Id < $end
+                ORDER BY Id";
+        }
+        else
+        {
+            cmd.CommandText = $@"
+                SELECT Id, FirstName, LastName, Email, Age, City, Progress
+                FROM People
+                {_orderByClause}
+                LIMIT $count OFFSET $start";
+        }
+        
+        cmd.Parameters.AddWithValue("$start", startIndex);
+        cmd.Parameters.AddWithValue("$count", count);
         cmd.Parameters.AddWithValue("$end", startIndex + count + 1);
 
         using var reader = cmd.ExecuteReader();
@@ -144,7 +174,6 @@ public class SqliteDataProvider : IDataProvider, IList
                 Progress = reader.GetDouble(6)
             };
             result.Add(record);
-            _cache[record.Id - 1] = record;
         }
 
         return new ValueTask<IReadOnlyList<PersonRecord>>(result);
@@ -152,21 +181,30 @@ public class SqliteDataProvider : IDataProvider, IList
 
     public PersonRecord? GetAt(int index)
     {
-        if (_cache.TryGetValue(index, out var cached))
-            return cached;
-
         using var cmd = _connection.CreateCommand();
-        cmd.CommandText = @"
-            SELECT Id, FirstName, LastName, Email, Age, City, Progress
-            FROM People
-            WHERE Id = $id";
         
-        cmd.Parameters.AddWithValue("$id", index + 1);
+        if (string.IsNullOrEmpty(_orderByClause))
+        {
+            cmd.CommandText = @"
+                SELECT Id, FirstName, LastName, Email, Age, City, Progress
+                FROM People
+                WHERE Id = $id";
+            cmd.Parameters.AddWithValue("$id", index + 1);
+        }
+        else
+        {
+            cmd.CommandText = $@"
+                SELECT Id, FirstName, LastName, Email, Age, City, Progress
+                FROM People
+                {_orderByClause}
+                LIMIT 1 OFFSET $offset";
+            cmd.Parameters.AddWithValue("$offset", index);
+        }
 
         using var reader = cmd.ExecuteReader();
         if (reader.Read())
         {
-            var record = new PersonRecord
+            return new PersonRecord
             {
                 Id = reader.GetInt32(0),
                 FirstName = reader.GetString(1),
@@ -176,8 +214,6 @@ public class SqliteDataProvider : IDataProvider, IList
                 City = reader.GetString(5),
                 Progress = reader.GetDouble(6)
             };
-            _cache[index] = record;
-            return record;
         }
 
         return null;
@@ -203,13 +239,6 @@ public class SqliteDataProvider : IDataProvider, IList
         cmd.Parameters.AddWithValue("$value", value);
         cmd.Parameters.AddWithValue("$id", index + 1);
         cmd.ExecuteNonQuery();
-
-        // Update cache
-        if (_cache.TryGetValue(index, out var record))
-        {
-            var prop = typeof(PersonRecord).GetProperty(column);
-            prop?.SetValue(record, value);
-        }
 
         OnDataChanged(new DataProviderChangedEventArgs(DataProviderChangeType.ItemsReplaced, index, 1));
     }
