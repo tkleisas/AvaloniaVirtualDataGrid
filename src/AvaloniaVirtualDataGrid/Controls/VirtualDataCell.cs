@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using AvaloniaVirtualDataGrid.Columns;
 
 namespace AvaloniaVirtualDataGrid.Controls;
 
@@ -147,11 +148,32 @@ public class VirtualDataCell : ContentControl
     {
         if (Column != null && DataContext != null && _editContent != null)
         {
+            var oldValue = Column is VirtualDataGridTextColumn textCol 
+                ? textCol.GetRawValue(DataContext) 
+                : null;
+            
             Column.CommitEdit(_editContent, DataContext);
+            
+            var newValue = Column is VirtualDataGridTextColumn textCol2 
+                ? textCol2.GetRawValue(DataContext) 
+                : null;
+
             _editContent = null;
+            IsEditing = false;
+
+            if (!Equals(oldValue, newValue) && OwnerGrid != null)
+            {
+                OwnerGrid.OnCellEdited(this, oldValue, newValue);
+            }
         }
-        IsEditing = false;
+        else
+        {
+            _editContent = null;
+            IsEditing = false;
+        }
     }
+
+    internal VirtualDataGrid? OwnerGrid { get; set; }
 
     public void CancelEdit()
     {

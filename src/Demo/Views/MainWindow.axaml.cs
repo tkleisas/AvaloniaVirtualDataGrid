@@ -45,9 +45,21 @@ public partial class MainWindow : Window
 
         SetupColumns();
         _dataGrid.ItemsSource = _sqliteProvider;
+        _dataGrid.CellEditCompleted += OnCellEditCompleted;
 
         var countText = this.FindControl<TextBlock>("CountText")!;
         countText.Text = $"SQLite: {_sqliteProvider.Count:N0} rows (WAL mode)";
+    }
+
+    private void OnCellEditCompleted(object? sender, CellEditEventArgs e)
+    {
+        if (_sqliteProvider != null && e.Item is PersonRecord record)
+        {
+            // Map column header to property name
+            var propertyName = e.ColumnName.Replace(" ", "");
+            _sqliteProvider.Update(e.RowIndex, propertyName, e.NewValue);
+            Console.WriteLine($"Updated row {e.RowIndex}, column {e.ColumnName}: {e.OldValue} -> {e.NewValue}");
+        }
     }
 
     private void InitializeMemoryData()

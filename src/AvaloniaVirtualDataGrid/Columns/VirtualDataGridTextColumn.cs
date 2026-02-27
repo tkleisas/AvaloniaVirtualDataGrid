@@ -79,6 +79,11 @@ public class VirtualDataGridTextColumn : VirtualDataGridColumn
         };
     }
 
+    public object? GetRawValue(object? item)
+    {
+        return _getter?.Invoke(item);
+    }
+
     public override Control? CreateEditContent(object? item)
     {
         if (_setter == null) return null;

@@ -85,6 +85,7 @@ public class VirtualDataGrid : TemplatedControl
     public event EventHandler<DataGridSelectionChangedEventArgs>? SelectionChanged;
     public event EventHandler<RoutedEventArgs>? RowDoubleClick;
     public event EventHandler<RoutedEventArgs>? CellClick;
+    public event EventHandler<CellEditEventArgs>? CellEditCompleted;
 
     static VirtualDataGrid()
     {
@@ -261,7 +262,8 @@ public class VirtualDataGrid : TemplatedControl
                 var cell = new VirtualDataCell
                 {
                     Column = column,
-                    DataContext = item
+                    DataContext = item,
+                    OwnerGrid = this
                 };
 
                 var content = column.CreateCellContent(item);
@@ -362,10 +364,44 @@ public class VirtualDataGrid : TemplatedControl
         UpdateRowSelectionStates();
     }
 
+    internal void OnCellEdited(VirtualDataCell cell, object? oldValue, object? newValue)
+    {
+        if (cell.Column == null || cell.DataContext == null) return;
+
+        var rowIndex = _items?.IndexOf(cell.DataContext) ?? -1;
+        if (rowIndex < 0) return;
+
+        CellEditCompleted?.Invoke(this, new CellEditEventArgs(
+            rowIndex,
+            cell.DataContext,
+            cell.Column.Header,
+            oldValue,
+            newValue
+        ));
+    }
+
     protected override Size ArrangeOverride(Size finalSize)
     {
         var result = base.ArrangeOverride(finalSize);
         SyncColumnWidths();
         return result;
+    }
+}
+
+public class CellEditEventArgs : EventArgs
+{
+    public int RowIndex { get; }
+    public object? Item { get; }
+    public string ColumnName { get; }
+    public object? OldValue { get; }
+    public object? NewValue { get; }
+
+    public CellEditEventArgs(int rowIndex, object? item, string columnName, object? oldValue, object? newValue)
+    {
+        RowIndex = rowIndex;
+        Item = item;
+        ColumnName = columnName;
+        OldValue = oldValue;
+        NewValue = newValue;
     }
 }
