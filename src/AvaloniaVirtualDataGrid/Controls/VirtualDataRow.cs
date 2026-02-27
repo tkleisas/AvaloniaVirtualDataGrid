@@ -90,11 +90,11 @@ public class VirtualDataRow : ContentControl
     {
         if (IsSelected)
         {
-            Background = new SolidColorBrush(Color.FromArgb(30, 0, 120, 215));
+            Background = new SolidColorBrush(Color.FromArgb(40, 0, 120, 215));
         }
         else
         {
-            Background = null;
+            Background = new SolidColorBrush(Colors.White);
         }
     }
 }

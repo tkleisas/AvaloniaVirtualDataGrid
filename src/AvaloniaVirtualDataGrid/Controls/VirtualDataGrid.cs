@@ -8,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using AvaloniaVirtualDataGrid.Core;
+using AvaloniaVirtualDataGrid.Services;
 
 namespace AvaloniaVirtualDataGrid.Controls;
 
@@ -15,6 +16,8 @@ public class VirtualDataGrid : TemplatedControl
 {
     private VirtualDataGridPanel? _itemsPanel;
     private ScrollViewer? _scrollViewer;
+    private readonly SelectionService _selectionService;
+    private IList? _items;
 
     public static readonly StyledProperty<IEnumerable?> ItemsSourceProperty =
         AvaloniaProperty.Register<VirtualDataGrid, IEnumerable?>(nameof(ItemsSource));
@@ -27,6 +30,9 @@ public class VirtualDataGrid : TemplatedControl
 
     public static readonly StyledProperty<double> RowHeightProperty =
         AvaloniaProperty.Register<VirtualDataGrid, double>(nameof(RowHeight), 32.0);
+
+    public static readonly StyledProperty<DataGridSelectionMode> SelectionModeProperty =
+        AvaloniaProperty.Register<VirtualDataGrid, DataGridSelectionMode>(nameof(SelectionMode), DataGridSelectionMode.Single);
 
     public static readonly StyledProperty<int> SelectedIndexProperty =
         AvaloniaProperty.Register<VirtualDataGrid, int>(nameof(SelectedIndex), -1);
@@ -54,6 +60,12 @@ public class VirtualDataGrid : TemplatedControl
         set => SetValue(RowHeightProperty, value);
     }
 
+    public DataGridSelectionMode SelectionMode
+    {
+        get => GetValue(SelectionModeProperty);
+        set => SetValue(SelectionModeProperty, value);
+    }
+
     public int SelectedIndex
     {
         get => GetValue(SelectedIndexProperty);
@@ -66,13 +78,16 @@ public class VirtualDataGrid : TemplatedControl
         set => SetValue(SelectedItemProperty, value);
     }
 
-    public event EventHandler<SelectionChangedEventArgs>? SelectionChanged;
+    public IReadOnlySet<int> SelectedIndices => _selectionService.SelectedIndices;
+
+    public event EventHandler<DataGridSelectionChangedEventArgs>? SelectionChanged;
     public event EventHandler<RoutedEventArgs>? RowDoubleClick;
     public event EventHandler<RoutedEventArgs>? CellClick;
 
     static VirtualDataGrid()
     {
         ItemsSourceProperty.Changed.AddClassHandler<VirtualDataGrid>((x, e) => x.OnItemsSourceChanged(e));
+        SelectionModeProperty.Changed.AddClassHandler<VirtualDataGrid>((x, e) => x.OnSelectionModeChanged(e));
         SelectedIndexProperty.Changed.AddClassHandler<VirtualDataGrid>((x, e) => x.OnSelectedIndexChanged(e));
         SelectedItemProperty.Changed.AddClassHandler<VirtualDataGrid>((x, e) => x.OnSelectedItemChanged(e));
     }
@@ -81,6 +96,9 @@ public class VirtualDataGrid : TemplatedControl
     {
         _columns = new VirtualDataGridColumnCollection();
         _columns.CollectionChanged += (s, e) => OnColumnsCollectionChanged(s, e);
+        
+        _selectionService = new SelectionService();
+        _selectionService.SelectionChanged += OnSelectionServiceChanged;
     }
 
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
@@ -102,6 +120,32 @@ public class VirtualDataGrid : TemplatedControl
         }
 
         SyncColumnWidths();
+        
+        AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
+    }
+
+    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (_itemsPanel == null) return;
+
+        var point = e.GetCurrentPoint(_itemsPanel);
+        if (point.Properties.IsLeftButtonPressed)
+        {
+            var hitTest = _itemsPanel.InputHitTest(point.Position);
+            if (hitTest is VirtualDataRow row)
+            {
+                var index = row.Index;
+                if (index >= 0)
+                {
+                    var modifiers = e.KeyModifiers;
+                    var ctrlPressed = (modifiers & KeyModifiers.Control) != 0;
+                    var shiftPressed = (modifiers & KeyModifiers.Shift) != 0;
+                    
+                    _selectionService.HandleClick(index, ctrlPressed, shiftPressed);
+                    UpdateRowSelectionStates();
+                }
+            }
+        }
     }
 
     private void OnScrollChanged(object? sender, ScrollChangedEventArgs e)
@@ -114,9 +158,13 @@ public class VirtualDataGrid : TemplatedControl
         {
             if (item == null) return null;
 
+            var index = _items?.IndexOf(item) ?? -1;
+
             var row = new VirtualDataRow
             {
-                DataContext = item
+                DataContext = item,
+                Index = index,
+                IsSelected = _selectionService.IsSelected(index)
             };
 
             foreach (var column in Columns)
@@ -147,6 +195,9 @@ public class VirtualDataGrid : TemplatedControl
 
     private void OnItemsSourceChanged(AvaloniaPropertyChangedEventArgs e)
     {
+        _items = e.NewValue as IList;
+        _selectionService.SetGetItemFunc(i => _items != null && i >= 0 && i < _items.Count ? _items[i] : null);
+        _selectionService.ClearSelection();
         UpdatePanelItemsSource();
     }
 
@@ -168,12 +219,58 @@ public class VirtualDataGrid : TemplatedControl
         }
     }
 
+    private void OnSelectionModeChanged(AvaloniaPropertyChangedEventArgs e)
+    {
+        _selectionService.SelectionMode = SelectionMode;
+    }
+
     private void OnSelectedIndexChanged(AvaloniaPropertyChangedEventArgs e)
     {
+        if (!_selectionService.IsSelected((int)e.NewValue!))
+        {
+            _selectionService.SelectedIndex = (int)e.NewValue!;
+            UpdateRowSelectionStates();
+        }
     }
 
     private void OnSelectedItemChanged(AvaloniaPropertyChangedEventArgs e)
     {
+        _selectionService.SelectedItem = e.NewValue;
+        UpdateRowSelectionStates();
+    }
+
+    private void OnSelectionServiceChanged(object? sender, DataGridSelectionChangedEventArgs e)
+    {
+        SelectedIndex = _selectionService.SelectedIndex;
+        SelectedItem = _selectionService.SelectedItem;
+        
+        SelectionChanged?.Invoke(this, e);
+    }
+
+    private void UpdateRowSelectionStates()
+    {
+        if (_itemsPanel == null) return;
+
+        foreach (var child in _itemsPanel.Children)
+        {
+            if (child is VirtualDataRow row)
+            {
+                row.IsSelected = _selectionService.IsSelected(row.Index);
+            }
+        }
+    }
+
+    public void SelectAll()
+    {
+        var count = (ItemsSource as IDataProvider)?.Count ?? _items?.Count ?? 0;
+        _selectionService.SelectAll(count);
+        UpdateRowSelectionStates();
+    }
+
+    public void ClearSelection()
+    {
+        _selectionService.ClearSelection();
+        UpdateRowSelectionStates();
     }
 
     protected override Size ArrangeOverride(Size finalSize)
@@ -181,17 +278,5 @@ public class VirtualDataGrid : TemplatedControl
         var result = base.ArrangeOverride(finalSize);
         SyncColumnWidths();
         return result;
-    }
-}
-
-public class SelectionChangedEventArgs : RoutedEventArgs
-{
-    public IList AddedItems { get; }
-    public IList RemovedItems { get; }
-
-    public SelectionChangedEventArgs(IList addedItems, IList removedItems)
-    {
-        AddedItems = addedItems;
-        RemovedItems = removedItems;
     }
 }
