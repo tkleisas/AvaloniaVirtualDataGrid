@@ -60,9 +60,7 @@ public class VirtualDataRow : ContentControl
         {
             var colDef = new ColumnDefinition
             {
-                Width = cell.Column?.Width > 0 
-                    ? new GridLength(cell.Column.Width, GridUnitType.Pixel) 
-                    : new GridLength(100, GridUnitType.Pixel),
+                Width = new GridLength(cell.Column?.ActualWidth ?? 100, GridUnitType.Pixel),
                 MinWidth = cell.Column?.MinWidth ?? 20,
                 MaxWidth = cell.Column?.MaxWidth ?? double.PositiveInfinity
             };

@@ -1,6 +1,7 @@
 using System.Collections.Specialized;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 
@@ -9,6 +10,9 @@ namespace AvaloniaVirtualDataGrid.Controls;
 public class VirtualDataGridHeaderPanel : Grid
 {
     private VirtualDataGridColumnCollection? _columns;
+    private int _resizingColumnIndex = -1;
+    private double _resizeStartX;
+    private double _resizeStartWidth;
 
     public static readonly DirectProperty<VirtualDataGridHeaderPanel, VirtualDataGridColumnCollection?> ColumnsProperty =
         AvaloniaProperty.RegisterDirect<VirtualDataGridHeaderPanel, VirtualDataGridColumnCollection?>(
@@ -112,7 +116,74 @@ public class VirtualDataGridHeaderPanel : Grid
 
             SetColumn(headerBorder, i);
             Children.Add(headerBorder);
+
+            if (column.IsResizable)
+            {
+                var gripper = new Border
+                {
+                    Width = 5,
+                    Background = Brushes.Transparent,
+                    Cursor = new Cursor(StandardCursorType.SizeWestEast),
+                    IsHitTestVisible = true
+                };
+
+                gripper.PointerPressed += OnGripperPointerPressed;
+                gripper.PointerMoved += OnGripperPointerMoved;
+                gripper.PointerReleased += OnGripperPointerReleased;
+
+                SetColumn(gripper, i);
+                SetColumnSpan(gripper, 1);
+                gripper.HorizontalAlignment = HorizontalAlignment.Right;
+                gripper.Margin = new Thickness(0, 0, -2, 0);
+                gripper.Tag = i;
+                Children.Add(gripper);
+            }
         }
+    }
+
+    private void OnGripperPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border gripper || gripper.Tag is not int columnIndex)
+            return;
+
+        e.Pointer.Capture(gripper);
+        _resizingColumnIndex = columnIndex;
+        _resizeStartX = e.GetPosition(this).X;
+        _resizeStartWidth = _columns![columnIndex].ActualWidth;
+        e.Handled = true;
+    }
+
+    private void OnGripperPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_resizingColumnIndex < 0 || _columns == null)
+            return;
+
+        var currentX = e.GetPosition(this).X;
+        var delta = currentX - _resizeStartX;
+        var newWidth = _resizeStartWidth + delta;
+
+        var column = _columns[_resizingColumnIndex];
+        newWidth = Math.Max(column.MinWidth, Math.Min(column.MaxWidth, newWidth));
+
+        column.Width = newWidth;
+        column.ActualWidth = newWidth;
+
+        if (_resizingColumnIndex < ColumnDefinitions.Count)
+        {
+            ColumnDefinitions[_resizingColumnIndex].Width = new GridLength(newWidth, GridUnitType.Pixel);
+        }
+
+        e.Handled = true;
+    }
+
+    private void OnGripperPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_resizingColumnIndex >= 0 && sender is Border gripper)
+        {
+            e.Pointer.Capture(null);
+        }
+        _resizingColumnIndex = -1;
+        e.Handled = true;
     }
 
     private void UpdateColumnWidths()

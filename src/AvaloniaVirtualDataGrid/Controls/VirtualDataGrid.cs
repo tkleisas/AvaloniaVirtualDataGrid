@@ -294,7 +294,22 @@ public class VirtualDataGrid : TemplatedControl
 
     private void OnColumnsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        SyncColumnWidths();
+        if (e.NewItems != null)
+        {
+            foreach (VirtualDataGridColumn col in e.NewItems)
+            {
+                col.Owner = this;
+                col.ActualWidthChanged -= OnColumnActualWidthChanged;
+                col.ActualWidthChanged += OnColumnActualWidthChanged;
+            }
+        }
+        if (e.OldItems != null)
+        {
+            foreach (VirtualDataGridColumn col in e.OldItems)
+            {
+                col.ActualWidthChanged -= OnColumnActualWidthChanged;
+            }
+        }
         if (_itemsPanel != null)
         {
             _itemsPanel.ItemTemplate = CreateItemTemplate();
@@ -302,11 +317,30 @@ public class VirtualDataGrid : TemplatedControl
         InvalidateMeasure();
     }
 
+    private void OnColumnActualWidthChanged(object? sender, EventArgs e)
+    {
+        UpdateRowLayouts();
+    }
+
     private void SyncColumnWidths()
     {
         foreach (var column in Columns)
         {
             column.Owner = this;
+        }
+        UpdateRowLayouts();
+    }
+
+    private void UpdateRowLayouts()
+    {
+        if (_itemsPanel == null) return;
+
+        foreach (var child in _itemsPanel.Children)
+        {
+            if (child is VirtualDataRow row)
+            {
+                row.UpdateCellsLayout();
+            }
         }
     }
 
