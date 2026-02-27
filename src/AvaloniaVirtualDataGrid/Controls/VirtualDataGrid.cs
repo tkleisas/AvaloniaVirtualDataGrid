@@ -7,6 +7,7 @@ using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
+using Avalonia.VisualTree;
 using AvaloniaVirtualDataGrid.Core;
 using AvaloniaVirtualDataGrid.Services;
 
@@ -132,18 +133,16 @@ public class VirtualDataGrid : TemplatedControl
         if (point.Properties.IsLeftButtonPressed)
         {
             var hitTest = _itemsPanel.InputHitTest(point.Position);
-            if (hitTest is VirtualDataRow row)
+            var row = (hitTest as Visual)?.FindAncestorOfType<VirtualDataRow>();
+            
+            if (row != null && row.Index >= 0)
             {
-                var index = row.Index;
-                if (index >= 0)
-                {
-                    var modifiers = e.KeyModifiers;
-                    var ctrlPressed = (modifiers & KeyModifiers.Control) != 0;
-                    var shiftPressed = (modifiers & KeyModifiers.Shift) != 0;
-                    
-                    _selectionService.HandleClick(index, ctrlPressed, shiftPressed);
-                    UpdateRowSelectionStates();
-                }
+                var modifiers = e.KeyModifiers;
+                var ctrlPressed = (modifiers & KeyModifiers.Control) != 0;
+                var shiftPressed = (modifiers & KeyModifiers.Shift) != 0;
+                
+                _selectionService.HandleClick(row.Index, ctrlPressed, shiftPressed);
+                UpdateRowSelectionStates();
             }
         }
     }

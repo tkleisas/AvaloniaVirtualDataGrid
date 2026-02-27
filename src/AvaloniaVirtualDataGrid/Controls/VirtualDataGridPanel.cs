@@ -196,7 +196,14 @@ public class VirtualDataGridPanel : Panel
     {
         var container = GetContainerFromIndex(index);
         if (container != null)
+        {
+            if (container is VirtualDataRow row)
+            {
+                row.Index = index;
+                UpdateRowSelectionState(row, index);
+            }
             return container;
+        }
 
         var item = GetItemAtIndex(index);
         if (item == null) 
@@ -208,6 +215,11 @@ public class VirtualDataGridPanel : Panel
             if (container != null)
             {
                 container.DataContext = item;
+                if (container is VirtualDataRow row)
+                {
+                    row.Index = index;
+                    UpdateRowSelectionState(row, index);
+                }
             }
         }
 
@@ -220,6 +232,14 @@ public class VirtualDataGridPanel : Panel
         _containers[index] = container;
         
         return container;
+    }
+
+    private void UpdateRowSelectionState(VirtualDataRow row, int index)
+    {
+        if (this.GetVisualParent() is VirtualDataGrid grid)
+        {
+            row.IsSelected = grid.SelectedIndices.Contains(index);
+        }
     }
 
     private void RecycleContainers()
