@@ -104,7 +104,22 @@ public class VirtualDataGridTextColumn : VirtualDataGridColumn
 
             if (!Equals(currentValue?.ToString(), newValue))
             {
-                _setter(item, newValue);
+                var targetType = currentValue?.GetType() ?? typeof(string);
+                object? convertedValue = newValue;
+                
+                if (targetType != typeof(string) && !string.IsNullOrEmpty(newValue))
+                {
+                    try
+                    {
+                        convertedValue = Convert.ChangeType(newValue, targetType);
+                    }
+                    catch
+                    {
+                        return;
+                    }
+                }
+                
+                _setter(item, convertedValue);
             }
         }
     }
