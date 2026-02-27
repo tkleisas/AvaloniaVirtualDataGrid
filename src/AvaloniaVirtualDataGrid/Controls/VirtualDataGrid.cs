@@ -246,6 +246,7 @@ public class VirtualDataGrid : TemplatedControl
         }
 
         cell.IsEditing = false;
+        cell.Content = null;
         cell.Content = column?.CreateCellContent(dataContext);
         _editingCell = null;
     }
@@ -259,6 +260,7 @@ public class VirtualDataGrid : TemplatedControl
         var dataContext = cell.DataContext;
 
         cell.IsEditing = false;
+        cell.Content = null;
         cell.Content = column?.CreateCellContent(dataContext);
         _editingCell = null;
     }
