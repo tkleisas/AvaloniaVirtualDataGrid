@@ -19,6 +19,7 @@
 
         <local:VirtualDataGrid Grid.Row="1" 
                                x:Name="DataGrid"
-                               RowHeight="32"/>
+                               RowHeight="32"
+                               SelectionMode="Multiple"/>
     </Grid>
 </Window>
