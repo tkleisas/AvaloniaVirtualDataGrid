@@ -11,6 +11,7 @@ A high-performance virtualized DataGrid control for AvaloniaUI, designed to hand
 - **Column Resize** - Drag column header edges to resize columns
 - **Column Reorder** - Drag column headers to reorder columns
 - **Sorting** - Click headers to sort ascending/descending/none with visual indicators
+- **Async Loading** - `AsyncDataProvider<T>` with caching, prefetch, and loading placeholders
 - **Column Types** - Text columns with type conversion and template columns for custom content
 - **SQLite Support** - Demo includes WAL-mode SQLite backend for persistent storage
 - **Smooth Scrolling** - Efficient container recycling for butter-smooth scroll performance
@@ -245,16 +246,21 @@ The demo includes:
 - Progress bar template column
 - Multiple selection mode
 
-## Roadmap
+## Status
 
-- [x] UI Virtualization
-- [x] Column definitions (Text, Template)
-- [x] Row/cell selection (Single, Multiple)
-- [x] In-place editing with type conversion
-- [x] Column resize/reorder
-- [x] Sorting
-- [x] Async data loading with caching
-- [ ] Frozen columns
+**v1.0 Complete** - All core features implemented and tested.
+
+| Feature | Status |
+|---------|--------|
+| UI Virtualization | ✅ |
+| Column definitions (Text, Template) | ✅ |
+| Row/cell selection | ✅ |
+| In-place editing | ✅ |
+| Column resize/reorder | ✅ |
+| Sorting | ✅ |
+| Async data loading | ✅ |
+
+**Future considerations:** Frozen columns, grouping, filtering, row details.
 
 ---
 
