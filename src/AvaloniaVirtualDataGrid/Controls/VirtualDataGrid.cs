@@ -19,6 +19,7 @@ public class VirtualDataGrid : TemplatedControl
     private ScrollViewer? _scrollViewer;
     private readonly SelectionService _selectionService;
     private IList? _items;
+    private VirtualDataCell? _editingCell;
 
     public static readonly StyledProperty<IEnumerable?> ItemsSourceProperty =
         AvaloniaProperty.Register<VirtualDataGrid, IEnumerable?>(nameof(ItemsSource));
@@ -132,19 +133,134 @@ public class VirtualDataGrid : TemplatedControl
         var point = e.GetCurrentPoint(_itemsPanel);
         if (point.Properties.IsLeftButtonPressed)
         {
-            var hitTest = _itemsPanel.InputHitTest(point.Position);
-            var row = (hitTest as Visual)?.FindAncestorOfType<VirtualDataRow>();
-            
-            if (row != null && row.Index >= 0)
+            if (e.ClickCount == 2)
             {
-                var modifiers = e.KeyModifiers;
-                var ctrlPressed = (modifiers & KeyModifiers.Control) != 0;
-                var shiftPressed = (modifiers & KeyModifiers.Shift) != 0;
+                var hitTest = _itemsPanel.InputHitTest(point.Position);
+                var cell = (hitTest as Visual)?.FindAncestorOfType<VirtualDataCell>();
+                if (cell != null && cell.Column != null)
+                {
+                    BeginEdit(cell);
+                }
+            }
+            else
+            {
+                var hitTest = _itemsPanel.InputHitTest(point.Position);
+                var row = (hitTest as Visual)?.FindAncestorOfType<VirtualDataRow>();
                 
-                _selectionService.HandleClick(row.Index, ctrlPressed, shiftPressed);
-                UpdateRowSelectionStates();
+                if (row != null && row.Index >= 0)
+                {
+                    var modifiers = e.KeyModifiers;
+                    var ctrlPressed = (modifiers & KeyModifiers.Control) != 0;
+                    var shiftPressed = (modifiers & KeyModifiers.Shift) != 0;
+                    
+                    _selectionService.HandleClick(row.Index, ctrlPressed, shiftPressed);
+                    UpdateRowSelectionStates();
+                }
             }
         }
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+
+        if (_editingCell != null)
+        {
+            if (e.Key == Key.Enter)
+            {
+                CommitEdit();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                CancelEdit();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Tab)
+            {
+                CommitEdit();
+                MoveToNextCell(e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -1 : 1);
+                e.Handled = true;
+            }
+        }
+        else if (e.Key == Key.F2 && _selectionService.SelectedIndex >= 0)
+        {
+            var row = FindRowAtIndex(_selectionService.SelectedIndex);
+            if (row != null && row.Cells.Count > 0)
+            {
+                BeginEdit(row.Cells[0]);
+                e.Handled = true;
+            }
+        }
+    }
+
+    private VirtualDataRow? FindRowAtIndex(int index)
+    {
+        if (_itemsPanel == null) return null;
+        
+        foreach (var child in _itemsPanel.Children)
+        {
+            if (child is VirtualDataRow row && row.Index == index)
+                return row;
+        }
+        return null;
+    }
+
+    private void MoveToNextCell(int direction)
+    {
+        // TODO: Implement navigation between cells
+    }
+
+    public void BeginEdit(VirtualDataCell cell)
+    {
+        if (_editingCell == cell) return;
+        
+        CommitEdit();
+        
+        if (cell.Column?.CreateEditContent(cell.DataContext) is Control editControl)
+        {
+            _editingCell = cell;
+            cell.IsEditing = true;
+            cell.Content = editControl;
+            
+            if (editControl is TextBox textBox)
+            {
+                textBox.Focus();
+                textBox.SelectAll();
+            }
+        }
+    }
+
+    public void CommitEdit()
+    {
+        if (_editingCell == null) return;
+
+        var cell = _editingCell;
+        var column = cell.Column;
+        var dataContext = cell.DataContext;
+
+        if (column != null && dataContext != null)
+        {
+            var editContent = cell.Content as Control;
+            column.CommitEdit(editContent!, dataContext);
+        }
+
+        cell.IsEditing = false;
+        cell.Content = column?.CreateCellContent(dataContext);
+        _editingCell = null;
+    }
+
+    public void CancelEdit()
+    {
+        if (_editingCell == null) return;
+
+        var cell = _editingCell;
+        var column = cell.Column;
+        var dataContext = cell.DataContext;
+
+        cell.IsEditing = false;
+        cell.Content = column?.CreateCellContent(dataContext);
+        _editingCell = null;
     }
 
     private void OnScrollChanged(object? sender, ScrollChangedEventArgs e)

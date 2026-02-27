@@ -5,28 +5,84 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using AvaloniaVirtualDataGrid.Columns;
 using AvaloniaVirtualDataGrid.Controls;
-using AvaloniaVirtualDataGrid.Core;
-using Demo.Models;
+using Demo.Data;
 
 namespace Demo.Views;
 
 public partial class MainWindow : Window
 {
-    private readonly InMemoryDataProvider<Person> _dataProvider;
+    private SqliteDataProvider? _sqliteProvider;
+    private AvaloniaVirtualDataGrid.Core.InMemoryDataProvider<PersonRecord>? _memoryProvider;
     private readonly VirtualDataGrid _dataGrid;
+    private bool _useSqlite = true;
+    private string _dbPath = "people.db";
 
     public MainWindow()
     {
         InitializeComponent();
 
-        _dataProvider = new InMemoryDataProvider<Person>(Person.GenerateSampleData(100000));
-        
         _dataGrid = this.FindControl<VirtualDataGrid>("DataGrid")!;
+        
+        if (_useSqlite)
+        {
+            InitializeSqlite();
+        }
+        else
+        {
+            InitializeMemoryData();
+        }
+    }
+
+    private void InitializeSqlite()
+    {
+        var dbExists = File.Exists(_dbPath);
+        _sqliteProvider = new SqliteDataProvider(_dbPath);
+
+        if (!dbExists)
+        {
+            _sqliteProvider.PopulateData(100000);
+        }
+
         SetupColumns();
-        _dataGrid.ItemsSource = _dataProvider;
+        _dataGrid.ItemsSource = _sqliteProvider;
 
         var countText = this.FindControl<TextBlock>("CountText")!;
-        countText.Text = $"Showing {_dataProvider.Count:N0} rows";
+        countText.Text = $"SQLite: {_sqliteProvider.Count:N0} rows (WAL mode)";
+    }
+
+    private void InitializeMemoryData()
+    {
+        var people = GenerateMemoryData(100000);
+        _memoryProvider = new AvaloniaVirtualDataGrid.Core.InMemoryDataProvider<PersonRecord>(people);
+        
+        SetupColumns();
+        _dataGrid.ItemsSource = _memoryProvider;
+
+        var countText = this.FindControl<TextBlock>("CountText")!;
+        countText.Text = $"Memory: {_memoryProvider.Count:N0} rows";
+    }
+
+    private static IEnumerable<PersonRecord> GenerateMemoryData(int count)
+    {
+        var firstNames = new[] { "James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Barbara", "Richard", "Susan", "Joseph", "Jessica", "Thomas", "Sarah", "Charles", "Karen" };
+        var lastNames = new[] { "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin" };
+        var cities = new[] { "New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose" };
+
+        var random = new Random(42);
+
+        for (int i = 1; i <= count; i++)
+        {
+            yield return new PersonRecord
+            {
+                Id = i,
+                FirstName = firstNames[random.Next(firstNames.Length)],
+                LastName = lastNames[random.Next(lastNames.Length)],
+                Email = $"user{i}@example.com",
+                Age = random.Next(18, 80),
+                City = cities[random.Next(cities.Length)],
+                Progress = random.NextDouble()
+            };
+        }
     }
 
     private void InitializeComponent()
@@ -36,22 +92,21 @@ public partial class MainWindow : Window
 
     private void SetupColumns()
     {
-        _dataGrid.Columns.Add(new VirtualDataGridTextColumn("ID", p => (p as Person)?.Id));
-        _dataGrid.Columns.Add(new VirtualDataGridTextColumn("First Name", p => (p as Person)?.FirstName));
-        _dataGrid.Columns.Add(new VirtualDataGridTextColumn("Last Name", p => (p as Person)?.LastName));
-        _dataGrid.Columns.Add(new VirtualDataGridTextColumn("Email", p => (p as Person)?.Email));
-        _dataGrid.Columns.Add(new VirtualDataGridTextColumn("Age", p => (p as Person)?.Age));
-        _dataGrid.Columns.Add(new VirtualDataGridTextColumn("City", p => (p as Person)?.City));
+        _dataGrid.Columns.Add(new VirtualDataGridTextColumn("ID", p => (p as PersonRecord)?.Id));
+        _dataGrid.Columns.Add(VirtualDataGridTextColumn.Create<PersonRecord>("First Name", p => p.FirstName));
+        _dataGrid.Columns.Add(VirtualDataGridTextColumn.Create<PersonRecord>("Last Name", p => p.LastName));
+        _dataGrid.Columns.Add(VirtualDataGridTextColumn.Create<PersonRecord>("Email", p => p.Email));
+        _dataGrid.Columns.Add(VirtualDataGridTextColumn.Create<PersonRecord>("Age", p => p.Age));
+        _dataGrid.Columns.Add(VirtualDataGridTextColumn.Create<PersonRecord>("City", p => p.City));
         
-        // Progress bar column using template
         _dataGrid.Columns.Add(new VirtualDataGridTemplateColumn
         {
             Header = "Progress",
             CellTemplate = new FuncDataTemplate<object?>((item, _) =>
             {
-                if (item is not Person person) return null;
+                if (item is not PersonRecord person) return null;
                 
-                var progress = (person.Age - 18) / 62.0; // Age 18-80 maps to 0-1
+                var progress = person.Progress;
                 
                 return new Grid
                 {
@@ -87,5 +142,11 @@ public partial class MainWindow : Window
                 };
             })
         });
+    }
+
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        _sqliteProvider?.Close();
+        base.OnClosing(e);
     }
 }

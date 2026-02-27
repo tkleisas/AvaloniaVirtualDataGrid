@@ -34,13 +34,27 @@ public class VirtualDataGridTextColumn : VirtualDataGridColumn
         var getter = propertyExpression.Compile();
         Action<object?, object?>? setter = null;
 
-        if (propertyExpression.Body is MemberExpression memberExpr && 
-            memberExpr.Member is System.Reflection.PropertyInfo propInfo &&
-            propInfo.CanWrite)
+        // Handle both direct member access and conversion (when property type is value type cast to object)
+        MemberExpression? memberExpr = propertyExpression.Body as MemberExpression;
+        
+        // If it's a conversion (e.g., string -> object), get the operand
+        if (memberExpr == null && propertyExpression.Body is UnaryExpression unaryExpr && unaryExpr.NodeType == ExpressionType.Convert)
+        {
+            memberExpr = unaryExpr.Operand as MemberExpression;
+        }
+
+        if (memberExpr?.Member is System.Reflection.PropertyInfo propInfo && propInfo.CanWrite)
         {
             var param = Expression.Parameter(typeof(object), "value");
-            var convertedParam = Expression.Convert(param, propInfo.PropertyType);
-            var call = Expression.Call(propertyExpression.Parameters[0], propInfo.GetSetMethod()!, convertedParam);
+            Expression valueExpr = param;
+            
+            // Convert the value to the property type
+            if (propInfo.PropertyType != typeof(object))
+            {
+                valueExpr = Expression.Convert(param, propInfo.PropertyType);
+            }
+            
+            var call = Expression.Call(propertyExpression.Parameters[0], propInfo.GetSetMethod()!, valueExpr);
             var compiledSetter = Expression.Lambda<Action<T, object?>>(call, propertyExpression.Parameters[0], param).Compile();
             setter = (o, v) => { if (o is T t) compiledSetter(t, v); };
         }
