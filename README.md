@@ -6,7 +6,10 @@ A high-performance virtualized DataGrid control for AvaloniaUI, designed to hand
 
 - **UI Virtualization** - Only visible rows are rendered in the visual tree
 - **Data Virtualization** - `IDataProvider<T>` interface for async/on-demand data loading
-- **Column Types** - Text columns and template columns for custom content
+- **Row Selection** - Single and multiple selection with Ctrl/Shift support
+- **In-place Editing** - Double-click or F2 to edit, Enter/Escape to commit/cancel
+- **Column Types** - Text columns with type conversion and template columns for custom content
+- **SQLite Support** - Demo includes WAL-mode SQLite backend for persistent storage
 - **Smooth Scrolling** - Efficient container recycling for butter-smooth scroll performance
 - **Customizable** - Column widths, headers, cell templates, and styling
 - **.NET 10** - Built for the latest .NET
@@ -30,6 +33,7 @@ public class Person
     public string FirstName { get; set; }
     public string LastName { get; set; }
     public string Email { get; set; }
+    public int Age { get; set; }
 }
 ```
 
@@ -44,22 +48,37 @@ var people = Enumerable.Range(1, 1_000_000)
 var dataProvider = new InMemoryDataProvider<Person>(people);
 ```
 
-### 3. Setup the DataGrid
+### 3. Setup the DataGrid with editable columns
 
 ```csharp
 using AvaloniaVirtualDataGrid.Columns;
 using AvaloniaVirtualDataGrid.Controls;
 
-var grid = new VirtualDataGrid();
+var grid = new VirtualDataGrid
+{
+    SelectionMode = DataGridSelectionMode.Multiple
+};
 
+// Use Create<T> for editable columns with automatic type conversion
 grid.Columns.Add(new VirtualDataGridTextColumn("ID", p => (p as Person)?.Id));
-grid.Columns.Add(new VirtualDataGridTextColumn("First Name", p => (p as Person)?.FirstName));
-grid.Columns.Add(new VirtualDataGridTextColumn("Last Name", p => (p as Person)?.LastName));
+grid.Columns.Add(VirtualDataGridTextColumn.Create<Person>("First Name", p => p.FirstName));
+grid.Columns.Add(VirtualDataGridTextColumn.Create<Person>("Last Name", p => p.LastName));
+grid.Columns.Add(VirtualDataGridTextColumn.Create<Person>("Age", p => p.Age));
 
 grid.ItemsSource = dataProvider;
 ```
 
-### 4. Custom cell templates (Progress bars, icons, etc.)
+### 4. Handle edit completion (for persistence)
+
+```csharp
+grid.CellEditCompleted += (sender, e) =>
+{
+    Console.WriteLine($"Row {e.RowIndex}, Column {e.ColumnName}: {e.OldValue} -> {e.NewValue}");
+    // Persist changes to database, API, etc.
+};
+```
+
+### 5. Custom cell templates (Progress bars, icons, etc.)
 
 ```csharp
 grid.Columns.Add(new VirtualDataGridTemplateColumn
@@ -67,7 +86,7 @@ grid.Columns.Add(new VirtualDataGridTemplateColumn
     Header = "Progress",
     CellTemplate = new FuncDataTemplate<object?>((item, _) =>
     {
-        var progress = CalculateProgress(item);
+        var progress = (item as Person)?.Progress ?? 0;
         return new Grid
         {
             Children =
@@ -81,6 +100,37 @@ grid.Columns.Add(new VirtualDataGridTemplateColumn
 });
 ```
 
+## Selection
+
+```csharp
+// Single selection
+grid.SelectionMode = DataGridSelectionMode.Single;
+grid.SelectedIndex = 5;
+var selected = grid.SelectedItem;
+
+// Multiple selection
+grid.SelectionMode = DataGridSelectionMode.Multiple;
+grid.SelectAll();
+grid.ClearSelection();
+var selectedIndices = grid.SelectedIndices;
+```
+
+**Keyboard shortcuts:**
+- **Click** - Select row
+- **Ctrl+Click** - Toggle selection
+- **Shift+Click** - Range selection
+
+## Editing
+
+**Triggers:**
+- **Double-click** on a cell
+- **F2** when a row is selected
+
+**Keys:**
+- **Enter** - Commit edit
+- **Escape** - Cancel edit
+- **Tab** - Commit and move to next cell
+
 ## Architecture
 
 ```
@@ -89,10 +139,12 @@ VirtualDataGrid (main control)
 ├── ScrollViewer
 │   └── VirtualDataGridPanel (virtualizing panel)
 │       └── VirtualDataRow (recyclable containers)
-│           └── VirtualDataCell (with borders)
-└── Columns collection
-    ├── VirtualDataGridTextColumn
-    └── VirtualDataGridTemplateColumn
+│           └── VirtualDataCell (with borders, editing support)
+├── Columns collection
+│   ├── VirtualDataGridTextColumn
+│   └── VirtualDataGridTemplateColumn
+└── Services
+    └── SelectionService
 ```
 
 ### Data Provider Interface
@@ -107,7 +159,7 @@ public interface IDataProvider<T>
 ```
 
 Implement `IDataProvider<T>` for:
-- Database paging
+- Database paging (SQLite demo included)
 - API lazy loading
 - File streaming
 - Any custom async data source
@@ -129,12 +181,18 @@ cd src/Demo
 dotnet run
 ```
 
-The demo loads 100,000 rows with progress bar column.
+The demo includes:
+- **100,000 rows** stored in SQLite with WAL mode
+- Editable text columns with type conversion
+- Progress bar template column
+- Multiple selection mode
 
 ## Roadmap
 
-- [ ] Row/cell selection
-- [ ] In-place editing
+- [x] UI Virtualization
+- [x] Column definitions (Text, Template)
+- [x] Row/cell selection (Single, Multiple)
+- [x] In-place editing with type conversion
 - [ ] Column resize/reorder
 - [ ] Sorting
 - [ ] Frozen columns
