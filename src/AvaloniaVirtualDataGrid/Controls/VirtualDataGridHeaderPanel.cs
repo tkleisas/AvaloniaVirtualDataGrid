@@ -63,7 +63,7 @@ public class VirtualDataGridHeaderPanel : Grid
     public VirtualDataGridHeaderPanel()
     {
         Height = 32;
-        Background = new SolidColorBrush(Color.FromRgb(240, 240, 240));
+        Background = ThemeColors.HeaderBackground();
     }
 
     private Canvas GetOverlayCanvas()
@@ -150,7 +150,7 @@ public class VirtualDataGridHeaderPanel : Grid
             var headerBorder = new Border
             {
                 Background = Brushes.Transparent,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(204, 204, 204)),
+                BorderBrush = ThemeColors.Separator(),
                 BorderThickness = new Thickness(0, 0, 1, 0),
                 Child = headerPanel,
                 Tag = i,
@@ -197,7 +197,7 @@ public class VirtualDataGridHeaderPanel : Grid
         {
             Text = arrow,
             FontSize = 10,
-            Foreground = new SolidColorBrush(Color.FromRgb(100, 100, 100)),
+            Foreground = ThemeColors.MutedForeground(),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0)
         };
@@ -239,8 +239,8 @@ public class VirtualDataGridHeaderPanel : Grid
         {
             _dragGhost = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(200, 240, 240, 240)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(100, 100, 100)),
+                Background = ThemeColors.HeaderBackground(),
+                BorderBrush = ThemeColors.Separator(),
                 BorderThickness = new Thickness(1),
                 Child = new TextBlock
                 {
@@ -338,7 +338,7 @@ public class VirtualDataGridHeaderPanel : Grid
             _dropIndicator = new Border
             {
                 Width = 2,
-                Background = new SolidColorBrush(Color.FromRgb(0, 120, 215)),
+                Background = ThemeColors.AccentBrush(),
                 IsHitTestVisible = false
             };
             GetOverlayCanvas().Children.Add(_dropIndicator);

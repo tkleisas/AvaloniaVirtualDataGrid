@@ -36,8 +36,8 @@ public class VirtualDataRow : ContentControl
     {
         _cellsGrid = new Grid();
         Content = _cellsGrid;
-        Background = new SolidColorBrush(Colors.White);
-        BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
+        Background = Brushes.Transparent;
+        BorderBrush = ThemeColors.Separator();
         BorderThickness = new Thickness(0, 0, 0, 1);
 
         Cells = [];
@@ -54,7 +54,7 @@ public class VirtualDataRow : ContentControl
         _cellsGrid.ColumnDefinitions.Clear();
         _cellsGrid.Children.Clear();
 
-        var borderColor = new SolidColorBrush(Color.FromRgb(220, 220, 220));
+        var borderColor = ThemeColors.Separator();
 
         foreach (var cell in Cells)
         {
@@ -88,11 +88,11 @@ public class VirtualDataRow : ContentControl
     {
         if (IsSelected)
         {
-            Background = new SolidColorBrush(Color.FromArgb(40, 0, 120, 215));
+            Background = ThemeColors.SelectionBrush();
         }
         else
         {
-            Background = new SolidColorBrush(Colors.White);
+            Background = Brushes.Transparent;
         }
     }
 }

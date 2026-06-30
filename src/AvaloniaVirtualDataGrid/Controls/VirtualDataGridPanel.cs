@@ -103,7 +103,7 @@ public class VirtualDataGridPanel : Panel
 
     public VirtualDataGridPanel()
     {
-        Background = Brushes.White;
+        Background = Brushes.Transparent;
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -313,13 +313,13 @@ public class VirtualDataGridPanel : Panel
         {
             container = new Border
             {
-                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
+                Background = ThemeColors.Separator(),
                 Child = new TextBlock
                 {
                     Text = "Loading...",
                     VerticalAlignment = VerticalAlignment.Center,
                     HorizontalAlignment = HorizontalAlignment.Center,
-                    Foreground = new SolidColorBrush(Color.FromRgb(150, 150, 150))
+                    Foreground = ThemeColors.MutedForeground()
                 }
             };
         }

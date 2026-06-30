@@ -185,7 +185,7 @@ public class VirtualDataCell : ContentControl
     {
         if (IsSelected)
         {
-            BorderBrush = new SolidColorBrush(Color.FromRgb(0, 120, 215));
+            BorderBrush = ThemeColors.AccentBrush();
             BorderThickness = new Thickness(0, 0, 1, 0);
         }
         else
