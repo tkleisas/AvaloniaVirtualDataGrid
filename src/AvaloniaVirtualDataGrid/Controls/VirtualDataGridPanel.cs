@@ -307,7 +307,7 @@ public class VirtualDataGridPanel : Panel
         
         if (LoadingTemplate != null)
         {
-            container = LoadingTemplate.Build(index);
+            container = LoadingTemplate.Build(index) ?? new Control();
         }
         else
         {

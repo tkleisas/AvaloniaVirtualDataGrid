@@ -159,8 +159,14 @@ public class VirtualDataGrid : TemplatedControl
         {
             if (e.ClickCount == 2)
             {
-                var hitTest = _itemsPanel.InputHitTest(point.Position);
-                var cell = (hitTest as Visual)?.FindAncestorOfType<VirtualDataCell>();
+                var hitTest = _itemsPanel.InputHitTest(point.Position) as Visual;
+                var row = hitTest?.FindAncestorOfType<VirtualDataRow>();
+                if (row != null && row.Index >= 0)
+                {
+                    RowDoubleClick?.Invoke(this, new RoutedEventArgs());
+                }
+
+                var cell = hitTest?.FindAncestorOfType<VirtualDataCell>();
                 if (cell != null && cell.Column != null)
                 {
                     BeginEdit(cell);
@@ -168,17 +174,22 @@ public class VirtualDataGrid : TemplatedControl
             }
             else
             {
-                var hitTest = _itemsPanel.InputHitTest(point.Position);
-                var row = (hitTest as Visual)?.FindAncestorOfType<VirtualDataRow>();
-                
+                var hitTest = _itemsPanel.InputHitTest(point.Position) as Visual;
+                var row = hitTest?.FindAncestorOfType<VirtualDataRow>();
+
                 if (row != null && row.Index >= 0)
                 {
                     var modifiers = e.KeyModifiers;
                     var ctrlPressed = (modifiers & KeyModifiers.Control) != 0;
                     var shiftPressed = (modifiers & KeyModifiers.Shift) != 0;
-                    
+
                     _selectionService.HandleClick(row.Index, ctrlPressed, shiftPressed);
                     UpdateRowSelectionStates();
+
+                    if (hitTest?.FindAncestorOfType<VirtualDataCell>() != null)
+                    {
+                        CellClick?.Invoke(this, new RoutedEventArgs());
+                    }
                 }
             }
         }
